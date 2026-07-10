@@ -70,6 +70,11 @@ const STATUT_BADGE: Record<ProspectStatut, string> = {
 function ProspectsPage() {
   const prospects = useStore((s) => s.prospects);
   const setStatut = useStore((s) => s.setProspectStatut);
+  const equipe = useStore((s) => s.equipe);
+  const commerciaux = useMemo(
+    () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   const [filtre, setFiltre] = useState<{ commercial: string; besoin: string }>({
     commercial: "all",
     besoin: "all",
