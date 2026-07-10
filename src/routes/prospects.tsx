@@ -322,7 +322,7 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
           <Select value={f.commercial} onValueChange={(v) => setF({ ...f, commercial: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {COMMERCIAUX.map((c) => (
+              {commerciaux.map((c: string) => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
             </SelectContent>
