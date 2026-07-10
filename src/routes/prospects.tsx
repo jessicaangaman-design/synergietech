@@ -5,7 +5,6 @@ import {
   useStore,
   PROSPECT_STATUTS,
   BESOINS,
-  COMMERCIAUX,
   formatDate,
   type ProspectStatut,
   type BesoinType,
