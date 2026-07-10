@@ -234,7 +234,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
           <Select value={i.technicien} onValueChange={(v) => update(id, { technicien: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {TECHNICIENS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {techniciens.map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
