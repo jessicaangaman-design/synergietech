@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { Plus, CalendarDays, List } from "lucide-react";
 import {
   useStore,
-  TECHNICIENS,
   formatDateTime,
   formatDate,
   type Intervention,
