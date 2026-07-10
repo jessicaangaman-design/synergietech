@@ -250,6 +250,11 @@ function ProspectCard({
 
 function NewProspectDialog({ onClose }: { onClose: () => void }) {
   const addProspect = useStore((s) => s.addProspect);
+  const equipe = useStore((s) => s.equipe);
+  const commerciaux = useMemo(
+    () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   const [f, setF] = useState({
     nom: "",
     entreprise: "",
@@ -258,7 +263,7 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
     adresse: "",
     besoin: "vidéosurveillance" as BesoinType,
     source: "site web" as Source,
-    commercial: COMMERCIAUX[0],
+    commercial: commerciaux[0] ?? "",
   });
   return (
     <DialogContent className="max-w-lg">
