@@ -108,14 +108,60 @@ export interface Intervention {
   materielRemplace?: boolean;
 }
 
-export const COMMERCIAUX = ["Aya Kouamé", "Serge Diabaté", "Marlène N'Guessan", "Yves Kouassi"];
-export const TECHNICIENS = [
+export type MembreRole = "commercial" | "technicien";
+
+export interface Membre {
+  id: string;
+  nom: string;
+  role: MembreRole;
+  telephone?: string;
+  email?: string;
+  specialite?: string;
+  actif: boolean;
+  dateEmbauche?: string;
+}
+
+const SEED_COMMERCIAUX = ["Aya Kouamé", "Serge Diabaté", "Marlène N'Guessan", "Yves Kouassi"];
+const SEED_TECHNICIENS = [
   "Ibrahim Traoré",
   "Kouadio Yao",
   "Bakary Ouattara",
   "Franck Bamba",
   "Désiré Koffi",
 ];
+
+// Backwards-compat exports (initial seed values, used only for seed data)
+export const COMMERCIAUX = SEED_COMMERCIAUX;
+export const TECHNICIENS = SEED_TECHNICIENS;
+
+function seedEquipe(): Membre[] {
+  const specs: Record<string, string> = {
+    "Ibrahim Traoré": "Vidéosurveillance & alarmes",
+    "Kouadio Yao": "Contrôle d'accès",
+    "Bakary Ouattara": "Radios & réseaux",
+    "Franck Bamba": "Incendie & télésurveillance",
+    "Désiré Koffi": "Clôtures & motorisation",
+  };
+  return [
+    ...SEED_COMMERCIAUX.map<Membre>((nom) => ({
+      id: uid(),
+      nom,
+      role: "commercial",
+      email: nom.toLowerCase().replace(/[^a-z]+/g, ".") + "@sts.ci",
+      telephone: "+225 07 00 00 00 00",
+      actif: true,
+    })),
+    ...SEED_TECHNICIENS.map<Membre>((nom) => ({
+      id: uid(),
+      nom,
+      role: "technicien",
+      specialite: specs[nom],
+      email: nom.toLowerCase().replace(/[^a-z]+/g, ".") + "@sts.ci",
+      telephone: "+225 05 00 00 00 00",
+      actif: true,
+    })),
+  ];
+}
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -203,6 +249,7 @@ interface StoreState {
   prospects: Prospect[];
   contrats: Contrat[];
   interventions: Intervention[];
+  equipe: Membre[];
   addProspect: (p: Omit<Prospect, "id" | "notes" | "dateCreation" | "statut"> & { statut?: ProspectStatut }) => void;
   updateProspect: (id: string, patch: Partial<Prospect>) => void;
   setProspectStatut: (id: string, statut: ProspectStatut) => void;
@@ -214,6 +261,9 @@ interface StoreState {
   removeLigne: (id: string, ligneId: string) => void;
   addIntervention: (i: Omit<Intervention, "id">) => void;
   updateIntervention: (id: string, patch: Partial<Intervention>) => void;
+  addMembre: (m: Omit<Membre, "id" | "actif"> & { actif?: boolean }) => void;
+  updateMembre: (id: string, patch: Partial<Membre>) => void;
+  removeMembre: (id: string) => void;
   reset: () => void;
 }
 
@@ -221,7 +271,8 @@ const buildInitial = () => {
   const prospects = seedProspects();
   const contrats = seedContrats();
   const interventions = seedInterventions(contrats);
-  return { prospects, contrats, interventions };
+  const equipe = seedEquipe();
+  return { prospects, contrats, interventions, equipe };
 };
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -308,6 +359,30 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       interventions: s.interventions.map((i) => (i.id === id ? { ...i, ...patch } : i)),
     })),
+  addMembre: (m) =>
+    set((s) => ({
+      equipe: [{ ...m, id: uid(), actif: m.actif ?? true }, ...s.equipe],
+    })),
+  updateMembre: (id, patch) =>
+    set((s) => {
+      const prev = s.equipe.find((x) => x.id === id);
+      const next = s.equipe.map((x) => (x.id === id ? { ...x, ...patch } : x));
+      // Propager les renommages aux prospects/interventions pour cohérence
+      if (prev && patch.nom && patch.nom !== prev.nom) {
+        const nouveau = patch.nom;
+        return {
+          equipe: next,
+          prospects: s.prospects.map((p) =>
+            p.commercial === prev.nom ? { ...p, commercial: nouveau } : p,
+          ),
+          interventions: s.interventions.map((i) =>
+            i.technicien === prev.nom ? { ...i, technicien: nouveau } : i,
+          ),
+        };
+      }
+      return { equipe: next };
+    }),
+  removeMembre: (id) => set((s) => ({ equipe: s.equipe.filter((x) => x.id !== id) })),
   reset: () => set(buildInitial()),
 }));
 

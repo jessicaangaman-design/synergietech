@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 import { Plus, CalendarDays, List } from "lucide-react";
 import {
   useStore,
-  TECHNICIENS,
   formatDateTime,
   formatDate,
   type Intervention,
@@ -203,6 +202,11 @@ function WeekCalendar({ onOpen }: { onOpen: (id: string) => void }) {
 function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const i = useStore((s) => s.interventions.find((x) => x.id === id));
   const update = useStore((s) => s.updateIntervention);
+  const equipe = useStore((s) => s.equipe);
+  const techniciens = useMemo(
+    () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   if (!i) return null;
 
   return (
@@ -230,7 +234,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
           <Select value={i.technicien} onValueChange={(v) => update(id, { technicien: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {TECHNICIENS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {techniciens.map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -291,11 +295,16 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
 function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   const add = useStore((s) => s.addIntervention);
   const contrats = useStore((s) => s.contrats);
+  const equipe = useStore((s) => s.equipe);
+  const techniciens = useMemo(
+    () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   const [f, setF] = useState({
     clientNom: "",
     contratId: undefined as string | undefined,
     type: "Installation" as InterventionType,
-    technicien: TECHNICIENS[0],
+    technicien: techniciens[0] ?? "",
     dateHeure: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
     description: "",
   });
@@ -345,7 +354,7 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
           <Select value={f.technicien} onValueChange={(v) => setF({ ...f, technicien: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {TECHNICIENS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {techniciens.map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

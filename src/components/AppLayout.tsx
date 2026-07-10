@@ -1,6 +1,6 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
-import { LayoutDashboard, Users, FileText, Wrench, ShieldCheck, RotateCcw, Menu, X } from "lucide-react";
+import { LayoutDashboard, Users, FileText, Wrench, ShieldCheck, RotateCcw, Menu, X, UserCog } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -10,6 +10,7 @@ const NAV = [
   { to: "/prospects", label: "Prospects", icon: Users },
   { to: "/contrats", label: "Contrats", icon: FileText },
   { to: "/interventions", label: "Interventions", icon: Wrench },
+  { to: "/equipe", label: "Équipe", icon: UserCog },
 ] as const;
 
 export function AppLayout() {

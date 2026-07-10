@@ -5,7 +5,6 @@ import {
   useStore,
   PROSPECT_STATUTS,
   BESOINS,
-  COMMERCIAUX,
   formatDate,
   type ProspectStatut,
   type BesoinType,
@@ -71,6 +70,11 @@ const STATUT_BADGE: Record<ProspectStatut, string> = {
 function ProspectsPage() {
   const prospects = useStore((s) => s.prospects);
   const setStatut = useStore((s) => s.setProspectStatut);
+  const equipe = useStore((s) => s.equipe);
+  const commerciaux = useMemo(
+    () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   const [filtre, setFiltre] = useState<{ commercial: string; besoin: string }>({
     commercial: "all",
     besoin: "all",
@@ -111,7 +115,7 @@ function ProspectsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous commerciaux</SelectItem>
-                {COMMERCIAUX.map((c) => (
+                {commerciaux.map((c: string) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>
@@ -246,6 +250,11 @@ function ProspectCard({
 
 function NewProspectDialog({ onClose }: { onClose: () => void }) {
   const addProspect = useStore((s) => s.addProspect);
+  const equipe = useStore((s) => s.equipe);
+  const commerciaux = useMemo(
+    () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   const [f, setF] = useState({
     nom: "",
     entreprise: "",
@@ -254,7 +263,7 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
     adresse: "",
     besoin: "vidéosurveillance" as BesoinType,
     source: "site web" as Source,
-    commercial: COMMERCIAUX[0],
+    commercial: commerciaux[0] ?? "",
   });
   return (
     <DialogContent className="max-w-lg">
@@ -313,7 +322,7 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
           <Select value={f.commercial} onValueChange={(v) => setF({ ...f, commercial: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {COMMERCIAUX.map((c) => (
+              {commerciaux.map((c: string) => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
               ))}
             </SelectContent>

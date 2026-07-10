@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProspectsRouteImport } from './routes/prospects'
 import { Route as InterventionsRouteImport } from './routes/interventions'
+import { Route as EquipeRouteImport } from './routes/equipe'
 import { Route as ContratsRouteImport } from './routes/contrats'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -22,6 +23,11 @@ const ProspectsRoute = ProspectsRouteImport.update({
 const InterventionsRoute = InterventionsRouteImport.update({
   id: '/interventions',
   path: '/interventions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EquipeRoute = EquipeRouteImport.update({
+  id: '/equipe',
+  path: '/equipe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContratsRoute = ContratsRouteImport.update({
@@ -38,12 +44,14 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/contrats': typeof ContratsRoute
+  '/equipe': typeof EquipeRoute
   '/interventions': typeof InterventionsRoute
   '/prospects': typeof ProspectsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/contrats': typeof ContratsRoute
+  '/equipe': typeof EquipeRoute
   '/interventions': typeof InterventionsRoute
   '/prospects': typeof ProspectsRoute
 }
@@ -51,20 +59,28 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/contrats': typeof ContratsRoute
+  '/equipe': typeof EquipeRoute
   '/interventions': typeof InterventionsRoute
   '/prospects': typeof ProspectsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/contrats' | '/interventions' | '/prospects'
+  fullPaths: '/' | '/contrats' | '/equipe' | '/interventions' | '/prospects'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/contrats' | '/interventions' | '/prospects'
-  id: '__root__' | '/' | '/contrats' | '/interventions' | '/prospects'
+  to: '/' | '/contrats' | '/equipe' | '/interventions' | '/prospects'
+  id:
+    | '__root__'
+    | '/'
+    | '/contrats'
+    | '/equipe'
+    | '/interventions'
+    | '/prospects'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ContratsRoute: typeof ContratsRoute
+  EquipeRoute: typeof EquipeRoute
   InterventionsRoute: typeof InterventionsRoute
   ProspectsRoute: typeof ProspectsRoute
 }
@@ -83,6 +99,13 @@ declare module '@tanstack/react-router' {
       path: '/interventions'
       fullPath: '/interventions'
       preLoaderRoute: typeof InterventionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/equipe': {
+      id: '/equipe'
+      path: '/equipe'
+      fullPath: '/equipe'
+      preLoaderRoute: typeof EquipeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contrats': {
@@ -105,6 +128,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ContratsRoute: ContratsRoute,
+  EquipeRoute: EquipeRoute,
   InterventionsRoute: InterventionsRoute,
   ProspectsRoute: ProspectsRoute,
 }
