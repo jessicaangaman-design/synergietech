@@ -295,11 +295,16 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
 function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   const add = useStore((s) => s.addIntervention);
   const contrats = useStore((s) => s.contrats);
+  const equipe = useStore((s) => s.equipe);
+  const techniciens = useMemo(
+    () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   const [f, setF] = useState({
     clientNom: "",
     contratId: undefined as string | undefined,
     type: "Installation" as InterventionType,
-    technicien: TECHNICIENS[0],
+    technicien: techniciens[0] ?? "",
     dateHeure: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
     description: "",
   });
