@@ -249,6 +249,7 @@ interface StoreState {
   prospects: Prospect[];
   contrats: Contrat[];
   interventions: Intervention[];
+  equipe: Membre[];
   addProspect: (p: Omit<Prospect, "id" | "notes" | "dateCreation" | "statut"> & { statut?: ProspectStatut }) => void;
   updateProspect: (id: string, patch: Partial<Prospect>) => void;
   setProspectStatut: (id: string, statut: ProspectStatut) => void;
@@ -260,6 +261,9 @@ interface StoreState {
   removeLigne: (id: string, ligneId: string) => void;
   addIntervention: (i: Omit<Intervention, "id">) => void;
   updateIntervention: (id: string, patch: Partial<Intervention>) => void;
+  addMembre: (m: Omit<Membre, "id" | "actif"> & { actif?: boolean }) => void;
+  updateMembre: (id: string, patch: Partial<Membre>) => void;
+  removeMembre: (id: string) => void;
   reset: () => void;
 }
 
@@ -267,7 +271,8 @@ const buildInitial = () => {
   const prospects = seedProspects();
   const contrats = seedContrats();
   const interventions = seedInterventions(contrats);
-  return { prospects, contrats, interventions };
+  const equipe = seedEquipe();
+  return { prospects, contrats, interventions, equipe };
 };
 
 export const useStore = create<StoreState>((set, get) => ({
