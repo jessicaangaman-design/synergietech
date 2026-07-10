@@ -359,6 +359,30 @@ export const useStore = create<StoreState>((set, get) => ({
     set((s) => ({
       interventions: s.interventions.map((i) => (i.id === id ? { ...i, ...patch } : i)),
     })),
+  addMembre: (m) =>
+    set((s) => ({
+      equipe: [{ ...m, id: uid(), actif: m.actif ?? true }, ...s.equipe],
+    })),
+  updateMembre: (id, patch) =>
+    set((s) => {
+      const prev = s.equipe.find((x) => x.id === id);
+      const next = s.equipe.map((x) => (x.id === id ? { ...x, ...patch } : x));
+      // Propager les renommages aux prospects/interventions pour cohérence
+      if (prev && patch.nom && patch.nom !== prev.nom) {
+        const nouveau = patch.nom;
+        return {
+          equipe: next,
+          prospects: s.prospects.map((p) =>
+            p.commercial === prev.nom ? { ...p, commercial: nouveau } : p,
+          ),
+          interventions: s.interventions.map((i) =>
+            i.technicien === prev.nom ? { ...i, technicien: nouveau } : i,
+          ),
+        };
+      }
+      return { equipe: next };
+    }),
+  removeMembre: (id) => set((s) => ({ equipe: s.equipe.filter((x) => x.id !== id) })),
   reset: () => set(buildInitial()),
 }));
 
