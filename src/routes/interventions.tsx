@@ -354,7 +354,7 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
           <Select value={f.technicien} onValueChange={(v) => setF({ ...f, technicien: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {TECHNICIENS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {techniciens.map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
