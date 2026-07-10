@@ -115,7 +115,7 @@ function ProspectsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous commerciaux</SelectItem>
-                {COMMERCIAUX.map((c) => (
+                {commerciaux.map((c: string) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>
