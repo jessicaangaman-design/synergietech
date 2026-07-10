@@ -108,14 +108,60 @@ export interface Intervention {
   materielRemplace?: boolean;
 }
 
-export const COMMERCIAUX = ["Aya Kouamé", "Serge Diabaté", "Marlène N'Guessan", "Yves Kouassi"];
-export const TECHNICIENS = [
+export type MembreRole = "commercial" | "technicien";
+
+export interface Membre {
+  id: string;
+  nom: string;
+  role: MembreRole;
+  telephone?: string;
+  email?: string;
+  specialite?: string;
+  actif: boolean;
+  dateEmbauche?: string;
+}
+
+const SEED_COMMERCIAUX = ["Aya Kouamé", "Serge Diabaté", "Marlène N'Guessan", "Yves Kouassi"];
+const SEED_TECHNICIENS = [
   "Ibrahim Traoré",
   "Kouadio Yao",
   "Bakary Ouattara",
   "Franck Bamba",
   "Désiré Koffi",
 ];
+
+// Backwards-compat exports (initial seed values, used only for seed data)
+export const COMMERCIAUX = SEED_COMMERCIAUX;
+export const TECHNICIENS = SEED_TECHNICIENS;
+
+function seedEquipe(): Membre[] {
+  const specs: Record<string, string> = {
+    "Ibrahim Traoré": "Vidéosurveillance & alarmes",
+    "Kouadio Yao": "Contrôle d'accès",
+    "Bakary Ouattara": "Radios & réseaux",
+    "Franck Bamba": "Incendie & télésurveillance",
+    "Désiré Koffi": "Clôtures & motorisation",
+  };
+  return [
+    ...SEED_COMMERCIAUX.map<Membre>((nom) => ({
+      id: uid(),
+      nom,
+      role: "commercial",
+      email: nom.toLowerCase().replace(/[^a-z]+/g, ".") + "@sts.ci",
+      telephone: "+225 07 00 00 00 00",
+      actif: true,
+    })),
+    ...SEED_TECHNICIENS.map<Membre>((nom) => ({
+      id: uid(),
+      nom,
+      role: "technicien",
+      specialite: specs[nom],
+      email: nom.toLowerCase().replace(/[^a-z]+/g, ".") + "@sts.ci",
+      telephone: "+225 05 00 00 00 00",
+      actif: true,
+    })),
+  ];
+}
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
