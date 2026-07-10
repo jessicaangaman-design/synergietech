@@ -202,6 +202,11 @@ function WeekCalendar({ onOpen }: { onOpen: (id: string) => void }) {
 function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const i = useStore((s) => s.interventions.find((x) => x.id === id));
   const update = useStore((s) => s.updateIntervention);
+  const equipe = useStore((s) => s.equipe);
+  const techniciens = useMemo(
+    () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
+    [equipe],
+  );
   if (!i) return null;
 
   return (
