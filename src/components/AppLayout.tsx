@@ -1,6 +1,8 @@
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
-import { LayoutDashboard, Users, FileText, Wrench, ShieldCheck, RotateCcw, Menu, X, UserCog } from "lucide-react";
+import { LayoutDashboard, Users, FileText, Wrench, RotateCcw, Menu, X, UserCog } from "lucide-react";
+import logoSts from "@/assets/logo-sts.jpg.asset.json";
+
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
