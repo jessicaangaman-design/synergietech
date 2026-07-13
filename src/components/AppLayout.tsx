@@ -112,9 +112,10 @@ export function AppLayout() {
             <Menu className="h-5 w-5" />
           </button>
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-md bg-primary text-primary-foreground grid place-items-center">
-              <ShieldCheck className="h-4 w-4" />
+            <div className="h-7 w-7 rounded-md bg-white grid place-items-center overflow-hidden ring-1 ring-border">
+              <img src={logoSts.url} alt="STS" className="h-full w-full object-contain" />
             </div>
+
             <div className="font-semibold text-sm">STS SARL</div>
           </div>
         </div>
