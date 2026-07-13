@@ -58,14 +58,37 @@ function Dashboard() {
     return { actifs, tauxConv, caActif, semaineIntv, echeance };
   }, [prospects, contrats, interventions]);
 
-  const prospectsChart = useMemo(
-    () =>
-      PROSPECT_STATUTS.map((s) => ({
-        statut: s,
-        nombre: prospects.filter((p) => p.statut === s).length,
-      })),
-    [prospects],
-  );
+  const prospectsChart = useMemo(() => {
+    if (prospects.length === 0) return { data: [], tauxConversion: 0, totalContactes: 0, totalConvertis: 0 };
+    const sorted = [...prospects].sort(
+      (a, b) => +new Date(a.dateCreation) - +new Date(b.dateCreation),
+    );
+    // Group by month
+    const monthMap = new Map<string, { label: string; contactes: number; convertis: number }>();
+    for (const p of sorted) {
+      const d = new Date(p.dateCreation);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      const label = `${MOIS_COURTS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+      const cur = monthMap.get(key) || { label, contactes: 0, convertis: 0 };
+      cur.contactes += 1;
+      if (p.statut === "Converti") cur.convertis += 1;
+      monthMap.set(key, cur);
+    }
+    let cumContactes = 0;
+    let cumConvertis = 0;
+    const data = [...monthMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v]) => {
+        cumContactes += v.contactes;
+        cumConvertis += v.convertis;
+        return { mois: v.label, contactes: cumContactes, convertis: cumConvertis };
+      });
+    const totalContactes = prospects.length;
+    const totalConvertis = prospects.filter((p) => p.statut === "Converti").length;
+    const tauxConversion = totalContactes > 0 ? Math.round((totalConvertis / totalContactes) * 100) : 0;
+    return { data, tauxConversion, totalContactes, totalConvertis };
+  }, [prospects]);
+
 
   const caParService = useMemo(() => {
     const map = new Map<string, number>();
