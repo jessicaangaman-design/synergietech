@@ -152,25 +152,66 @@ function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Prospects par statut</CardTitle>
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="text-base">Évolution des prospects contactés</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cumul mensuel — {prospectsChart.totalContactes} prospects contactés au total
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-2xl font-semibold text-primary">{prospectsChart.tauxConversion}%</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                deviennent clients
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                {prospectsChart.totalConvertis} / {prospectsChart.totalContactes}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={prospectsChart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="statut" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }} />
-                <Bar dataKey="nombre" radius={[6, 6, 0, 0]}>
-                  {prospectsChart.map((d, i) => (
-                    <Cell key={i} fill={STATUT_COLORS[d.statut] || "var(--chart-1)"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {prospectsChart.data.length === 0 ? (
+              <div className="h-[260px] grid place-items-center text-sm text-muted-foreground">
+                Aucun prospect enregistré pour le moment
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={prospectsChart.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="contactes"
+                    name="Prospects contactés"
+                    stroke="var(--chart-1)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="convertis"
+                    name="Devenus clients"
+                    stroke="var(--chart-3)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
+
 
         <Card>
           <CardHeader>
