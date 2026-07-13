@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -22,7 +22,6 @@ import {
   formatFCFA,
   formatDate,
   daysUntil,
-  PROSPECT_STATUTS,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
