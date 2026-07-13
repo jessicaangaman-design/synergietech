@@ -24,14 +24,15 @@ export function AppLayout() {
     <>
       <div className="px-5 py-6 border-b border-sidebar-border flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground grid place-items-center">
-            <ShieldCheck className="h-5 w-5" />
+          <div className="h-10 w-10 rounded-lg bg-white grid place-items-center overflow-hidden ring-1 ring-sidebar-border">
+            <img src={logoSts.url} alt="STS SARL" className="h-full w-full object-contain" />
           </div>
           <div>
             <div className="font-semibold tracking-tight">STS SARL</div>
             <div className="text-[11px] text-sidebar-foreground/60">Synergie Tech Solutions</div>
           </div>
         </div>
+
         <button
           className="lg:hidden text-sidebar-foreground/70"
           onClick={() => setMobileOpen(false)}
