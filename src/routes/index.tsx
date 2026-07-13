@@ -28,14 +28,8 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const STATUT_COLORS: Record<string, string> = {
-  Nouveau: "var(--chart-1)",
-  Contacté: "var(--chart-6)",
-  "Devis envoyé": "var(--chart-2)",
-  Négociation: "var(--chart-7)",
-  Converti: "var(--chart-3)",
-  Perdu: "var(--chart-4)",
-};
+const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
 
 function Dashboard() {
   const prospects = useStore((s) => s.prospects);
