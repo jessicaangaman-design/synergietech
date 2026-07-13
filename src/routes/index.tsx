@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -22,21 +22,14 @@ import {
   formatFCFA,
   formatDate,
   daysUntil,
-  PROSPECT_STATUTS,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const STATUT_COLORS: Record<string, string> = {
-  Nouveau: "var(--chart-1)",
-  Contacté: "var(--chart-6)",
-  "Devis envoyé": "var(--chart-2)",
-  Négociation: "var(--chart-7)",
-  Converti: "var(--chart-3)",
-  Perdu: "var(--chart-4)",
-};
+const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
 
 function Dashboard() {
   const prospects = useStore((s) => s.prospects);
@@ -65,14 +58,37 @@ function Dashboard() {
     return { actifs, tauxConv, caActif, semaineIntv, echeance };
   }, [prospects, contrats, interventions]);
 
-  const prospectsChart = useMemo(
-    () =>
-      PROSPECT_STATUTS.map((s) => ({
-        statut: s,
-        nombre: prospects.filter((p) => p.statut === s).length,
-      })),
-    [prospects],
-  );
+  const prospectsChart = useMemo(() => {
+    if (prospects.length === 0) return { data: [], tauxConversion: 0, totalContactes: 0, totalConvertis: 0 };
+    const sorted = [...prospects].sort(
+      (a, b) => +new Date(a.dateCreation) - +new Date(b.dateCreation),
+    );
+    // Group by month
+    const monthMap = new Map<string, { label: string; contactes: number; convertis: number }>();
+    for (const p of sorted) {
+      const d = new Date(p.dateCreation);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      const label = `${MOIS_COURTS[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+      const cur = monthMap.get(key) || { label, contactes: 0, convertis: 0 };
+      cur.contactes += 1;
+      if (p.statut === "Converti") cur.convertis += 1;
+      monthMap.set(key, cur);
+    }
+    let cumContactes = 0;
+    let cumConvertis = 0;
+    const data = [...monthMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v]) => {
+        cumContactes += v.contactes;
+        cumConvertis += v.convertis;
+        return { mois: v.label, contactes: cumContactes, convertis: cumConvertis };
+      });
+    const totalContactes = prospects.length;
+    const totalConvertis = prospects.filter((p) => p.statut === "Converti").length;
+    const tauxConversion = totalContactes > 0 ? Math.round((totalConvertis / totalContactes) * 100) : 0;
+    return { data, tauxConversion, totalContactes, totalConvertis };
+  }, [prospects]);
+
 
   const caParService = useMemo(() => {
     const map = new Map<string, number>();
@@ -136,25 +152,66 @@ function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Prospects par statut</CardTitle>
+          <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
+            <div>
+              <CardTitle className="text-base">Évolution des prospects contactés</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cumul mensuel — {prospectsChart.totalContactes} prospects contactés au total
+              </p>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-2xl font-semibold text-primary">{prospectsChart.tauxConversion}%</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                deviennent clients
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                {prospectsChart.totalConvertis} / {prospectsChart.totalContactes}
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={prospectsChart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="statut" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }} />
-                <Bar dataKey="nombre" radius={[6, 6, 0, 0]}>
-                  {prospectsChart.map((d, i) => (
-                    <Cell key={i} fill={STATUT_COLORS[d.statut] || "var(--chart-1)"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {prospectsChart.data.length === 0 ? (
+              <div className="h-[260px] grid place-items-center text-sm text-muted-foreground">
+                Aucun prospect enregistré pour le moment
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={prospectsChart.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--popover)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="contactes"
+                    name="Prospects contactés"
+                    stroke="var(--chart-1)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="convertis"
+                    name="Devenus clients"
+                    stroke="var(--chart-3)"
+                    strokeWidth={2.5}
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
+
 
         <Card>
           <CardHeader>
