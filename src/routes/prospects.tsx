@@ -1,6 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Filter, MoreVertical, ArrowRight, StickyNote } from "lucide-react";
+import {
+  Plus,
+  Filter,
+  MoreVertical,
+  ArrowRight,
+  StickyNote,
+  Phone,
+  Mail,
+  MapPin,
+  Building2,
+  User as UserIcon,
+  Search,
+} from "lucide-react";
 import {
   useStore,
   PROSPECT_STATUTS,
@@ -49,135 +61,316 @@ export const Route = createFileRoute("/prospects")({
   component: ProspectsPage,
 });
 
-const COLONNES: ProspectStatut[] = [
-  "Nouveau",
-  "Contacté",
-  "Devis envoyé",
-  "Négociation",
-  "Converti",
-  "Perdu",
-];
-
-const STATUT_BADGE: Record<ProspectStatut, string> = {
-  Nouveau: "bg-chart-1/15 text-chart-1 border-chart-1/30",
-  Contacté: "bg-chart-6/15 text-chart-6 border-chart-6/30",
-  "Devis envoyé": "bg-chart-2/15 text-chart-2 border-chart-2/30",
-  Négociation: "bg-chart-7/15 text-chart-7 border-chart-7/30",
-  Converti: "bg-success/15 text-success border-success/30",
-  Perdu: "bg-destructive/15 text-destructive border-destructive/30",
+const STATUT_STYLE: Record<
+  ProspectStatut,
+  { badge: string; dot: string; bar: string }
+> = {
+  Nouveau: {
+    badge: "bg-chart-1/15 text-chart-1 border-chart-1/30",
+    dot: "bg-chart-1",
+    bar: "bg-chart-1",
+  },
+  Contacté: {
+    badge: "bg-chart-6/15 text-chart-6 border-chart-6/30",
+    dot: "bg-chart-6",
+    bar: "bg-chart-6",
+  },
+  "Devis envoyé": {
+    badge: "bg-chart-2/15 text-chart-2 border-chart-2/30",
+    dot: "bg-chart-2",
+    bar: "bg-chart-2",
+  },
+  Négociation: {
+    badge: "bg-chart-7/15 text-chart-7 border-chart-7/30",
+    dot: "bg-chart-7",
+    bar: "bg-chart-7",
+  },
+  Converti: {
+    badge: "bg-success/15 text-success border-success/30",
+    dot: "bg-success",
+    bar: "bg-success",
+  },
+  Perdu: {
+    badge: "bg-destructive/15 text-destructive border-destructive/30",
+    dot: "bg-destructive",
+    bar: "bg-destructive",
+  },
 };
+
+function initials(nom: string) {
+  return nom
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() ?? "")
+    .join("");
+}
 
 function ProspectsPage() {
   const prospects = useStore((s) => s.prospects);
-  const setStatut = useStore((s) => s.setProspectStatut);
   const equipe = useStore((s) => s.equipe);
   const commerciaux = useMemo(
     () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
     [equipe],
   );
+
+  const [tab, setTab] = useState<ProspectStatut | "Tous">("Tous");
+  const [search, setSearch] = useState("");
   const [filtre, setFiltre] = useState<{ commercial: string; besoin: string }>({
     commercial: "all",
     besoin: "all",
   });
   const [openNew, setOpenNew] = useState(false);
   const [detail, setDetail] = useState<Prospect | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
 
-  const filtered = useMemo(
-    () =>
-      prospects.filter(
-        (p) =>
-          (filtre.commercial === "all" || p.commercial === filtre.commercial) &&
-          (filtre.besoin === "all" || p.besoin === filtre.besoin),
-      ),
-    [prospects, filtre],
-  );
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { Tous: prospects.length };
+    for (const s of PROSPECT_STATUTS) c[s] = 0;
+    for (const p of prospects) c[p.statut]++;
+    return c;
+  }, [prospects]);
 
-  const onDrop = (statut: ProspectStatut) => {
-    if (dragId) {
-      setStatut(dragId, statut);
-      toast.success(`Prospect déplacé vers "${statut}"`);
-      setDragId(null);
-    }
-  };
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return prospects.filter(
+      (p) =>
+        (tab === "Tous" || p.statut === tab) &&
+        (filtre.commercial === "all" || p.commercial === filtre.commercial) &&
+        (filtre.besoin === "all" || p.besoin === filtre.besoin) &&
+        (q === "" ||
+          p.nom.toLowerCase().includes(q) ||
+          (p.entreprise ?? "").toLowerCase().includes(q) ||
+          p.telephone.toLowerCase().includes(q) ||
+          p.email.toLowerCase().includes(q)),
+    );
+  }, [prospects, tab, filtre, search]);
 
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
         title="Prospects"
-        subtitle="Pipeline commercial — glissez-déposez pour changer un statut"
+        subtitle="Suivi commercial — filtrez par statut, commercial ou besoin"
         actions={
-          <>
-            <Select value={filtre.commercial} onValueChange={(v) => setFiltre((f) => ({ ...f, commercial: v }))}>
-              <SelectTrigger className="w-[180px]">
-                <Filter className="h-3.5 w-3.5 mr-1.5" />
-                <SelectValue placeholder="Commercial" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous commerciaux</SelectItem>
-                {commerciaux.map((c: string) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filtre.besoin} onValueChange={(v) => setFiltre((f) => ({ ...f, besoin: v }))}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Besoin" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous besoins</SelectItem>
-                {BESOINS.map((b) => (
-                  <SelectItem key={b} value={b}>
-                    {b}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Dialog open={openNew} onOpenChange={setOpenNew}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-1.5" /> Nouveau prospect
-                </Button>
-              </DialogTrigger>
-              <NewProspectDialog onClose={() => setOpenNew(false)} />
-            </Dialog>
-          </>
+          <Dialog open={openNew} onOpenChange={setOpenNew}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-1.5" /> Nouveau prospect
+              </Button>
+            </DialogTrigger>
+            <NewProspectDialog onClose={() => setOpenNew(false)} />
+          </Dialog>
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3 overflow-x-auto">
-        {COLONNES.map((col) => {
-          const items = filtered.filter((p) => p.statut === col);
+      {/* Status tabs */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-4 border-b border-border pb-3">
+        {(["Tous", ...PROSPECT_STATUTS] as const).map((s) => {
+          const active = tab === s;
+          const style = s === "Tous" ? null : STATUT_STYLE[s as ProspectStatut];
           return (
-            <div
-              key={col}
-              className="min-w-[240px] flex flex-col"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDrop(col)}
+            <button
+              key={s}
+              onClick={() => setTab(s)}
+              className={[
+                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium border transition-all",
+                active
+                  ? "bg-foreground text-background border-foreground shadow-sm"
+                  : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/40",
+              ].join(" ")}
             >
-              <div className="flex items-center justify-between px-2 py-2 mb-2 border-b-2 border-border">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                    {col}
-                  </span>
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {items.length}
-                  </Badge>
-                </div>
-              </div>
-              <div className="space-y-2 min-h-[200px]">
-                {items.map((p) => (
-                  <ProspectCard
+              {style && <span className={`h-2 w-2 rounded-full ${style.dot}`} />}
+              <span>{s}</span>
+              <span
+                className={[
+                  "text-[11px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums",
+                  active ? "bg-background/20 text-background" : "bg-muted text-foreground/70",
+                ].join(" ")}
+              >
+                {counts[s] ?? 0}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filters row */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un nom, une entreprise, un téléphone…"
+            className="pl-8"
+          />
+        </div>
+        <Select
+          value={filtre.commercial}
+          onValueChange={(v) => setFiltre((f) => ({ ...f, commercial: v }))}
+        >
+          <SelectTrigger className="w-[180px]">
+            <Filter className="h-3.5 w-3.5 mr-1.5" />
+            <SelectValue placeholder="Commercial" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous commerciaux</SelectItem>
+            {commerciaux.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filtre.besoin}
+          onValueChange={(v) => setFiltre((f) => ({ ...f, besoin: v }))}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Besoin" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous besoins</SelectItem>
+            {BESOINS.map((b) => (
+              <SelectItem key={b} value={b}>
+                {b}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table (desktop) */}
+      <Card className="hidden md:block overflow-hidden p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b border-border">
+              <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="py-3 pl-4 pr-2 font-semibold">Prospect</th>
+                <th className="py-3 px-2 font-semibold">Contact</th>
+                <th className="py-3 px-2 font-semibold">Besoin</th>
+                <th className="py-3 px-2 font-semibold">Commercial</th>
+                <th className="py-3 px-2 font-semibold">Statut</th>
+                <th className="py-3 px-2 font-semibold">Créé le</th>
+                <th className="py-3 pr-4 pl-2 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                    Aucun prospect ne correspond aux filtres.
+                  </td>
+                </tr>
+              )}
+              {filtered.map((p) => {
+                const st = STATUT_STYLE[p.statut];
+                return (
+                  <tr
                     key={p.id}
-                    p={p}
-                    onOpen={() => setDetail(p)}
-                    onDragStart={() => setDragId(p.id)}
-                  />
-                ))}
+                    onClick={() => setDetail(p)}
+                    className="border-b border-border last:border-0 hover:bg-muted/40 cursor-pointer transition-colors"
+                  >
+                    <td className="py-3 pl-4 pr-2">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
+                            {initials(p.nom)}
+                          </div>
+                          <span
+                            className={`absolute -left-1 top-0 h-9 w-1 rounded-full ${st.bar}`}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground truncate">{p.nom}</div>
+                          {p.entreprise && (
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                              <Building2 className="h-3 w-3" /> {p.entreprise}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Phone className="h-3 w-3" /> {p.telephone}
+                      </div>
+                      {p.email && (
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[220px]">
+                          <Mail className="h-3 w-3" /> {p.email}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 px-2">
+                      <Badge variant="outline" className="font-normal capitalize">
+                        {p.besoin}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-2 text-foreground/80">{p.commercial}</td>
+                    <td className="py-3 px-2">
+                      <Badge variant="outline" className={st.badge}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${st.dot} mr-1.5`} />
+                        {p.statut}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-2 text-muted-foreground text-xs">
+                      {formatDate(p.dateCreation)}
+                    </td>
+                    <td className="py-3 pr-4 pl-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {p.notes.length > 0 && (
+                          <span className="text-[11px] text-muted-foreground flex items-center gap-0.5 mr-1">
+                            <StickyNote className="h-3 w-3" />
+                            {p.notes.length}
+                          </span>
+                        )}
+                        <StatutMenu prospectId={p.id} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Cards (mobile) */}
+      <div className="md:hidden space-y-2">
+        {filtered.length === 0 && (
+          <Card className="p-8 text-center text-muted-foreground text-sm">
+            Aucun prospect ne correspond aux filtres.
+          </Card>
+        )}
+        {filtered.map((p) => {
+          const st = STATUT_STYLE[p.statut];
+          return (
+            <Card
+              key={p.id}
+              onClick={() => setDetail(p)}
+              className="p-3 cursor-pointer hover:border-accent/50 relative overflow-hidden"
+            >
+              <span className={`absolute left-0 top-0 bottom-0 w-1 ${st.bar}`} />
+              <div className="pl-2 flex items-start justify-between gap-2 mb-1.5">
+                <div className="min-w-0">
+                  <div className="font-medium text-sm truncate">{p.nom}</div>
+                  {p.entreprise && (
+                    <div className="text-xs text-muted-foreground truncate">{p.entreprise}</div>
+                  )}
+                </div>
+                <Badge variant="outline" className={st.badge}>
+                  {p.statut}
+                </Badge>
               </div>
-            </div>
+              <div className="pl-2 text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                <span className="flex items-center gap-1">
+                  <Phone className="h-3 w-3" /> {p.telephone}
+                </span>
+                <span className="capitalize">{p.besoin}</span>
+                <span className="flex items-center gap-1">
+                  <UserIcon className="h-3 w-3" /> {p.commercial}
+                </span>
+              </div>
+            </Card>
           );
         })}
       </div>
@@ -189,62 +382,31 @@ function ProspectsPage() {
   );
 }
 
-function ProspectCard({
-  p,
-  onOpen,
-  onDragStart,
-}: {
-  p: Prospect;
-  onOpen: () => void;
-  onDragStart: () => void;
-}) {
+function StatutMenu({ prospectId }: { prospectId: string }) {
   const setStatut = useStore((s) => s.setProspectStatut);
   return (
-    <Card
-      draggable
-      onDragStart={onDragStart}
-      onClick={onOpen}
-      className="p-3 cursor-pointer hover:shadow-md hover:border-accent/50 transition-all"
-    >
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <div className="min-w-0">
-          <div className="font-medium text-sm truncate">{p.nom}</div>
-          {p.entreprise && (
-            <div className="text-xs text-muted-foreground truncate">{p.entreprise}</div>
-          )}
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <button className="p-1 hover:bg-muted rounded">
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuLabel>Changer le statut</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {PROSPECT_STATUTS.map((s) => (
-              <DropdownMenuItem key={s} onClick={() => setStatut(p.id, s)}>
-                {s}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <div className="flex flex-wrap gap-1 mb-2">
-        <Badge variant="outline" className="text-[10px] font-normal">
-          {p.besoin}
-        </Badge>
-      </div>
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span className="truncate">{p.commercial}</span>
-        {p.notes.length > 0 && (
-          <span className="flex items-center gap-0.5">
-            <StickyNote className="h-3 w-3" />
-            {p.notes.length}
-          </span>
-        )}
-      </div>
-    </Card>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <button className="p-1.5 hover:bg-muted rounded">
+          <MoreVertical className="h-4 w-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuLabel>Changer le statut</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {PROSPECT_STATUTS.map((s) => (
+          <DropdownMenuItem
+            key={s}
+            onClick={() => {
+              setStatut(prospectId, s);
+              toast.success(`Statut : ${s}`);
+            }}
+          >
+            {s}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -355,26 +517,26 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
   const setStatut = useStore((s) => s.setProspectStatut);
   const [note, setNote] = useState("");
   const navigate = useNavigate();
-  // re-read from store to get updates
   const p = useStore((s) => s.prospects.find((x) => x.id === prospect.id)) || prospect;
+  const st = STATUT_STYLE[p.statut];
 
   return (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           {p.nom}
-          <Badge variant="outline" className={STATUT_BADGE[p.statut]}>{p.statut}</Badge>
+          <Badge variant="outline" className={st.badge}>{p.statut}</Badge>
         </DialogTitle>
         {p.entreprise && <DialogDescription>{p.entreprise}</DialogDescription>}
       </DialogHeader>
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mb-4">
-        <Info label="Téléphone" value={p.telephone} />
-        <Info label="Email" value={p.email} />
-        <Info label="Adresse" value={p.adresse} />
+        <Info icon={<Phone className="h-3.5 w-3.5" />} label="Téléphone" value={p.telephone} />
+        <Info icon={<Mail className="h-3.5 w-3.5" />} label="Email" value={p.email} />
+        <Info icon={<MapPin className="h-3.5 w-3.5" />} label="Adresse" value={p.adresse} />
         <Info label="Besoin" value={p.besoin} />
         <Info label="Source" value={p.source} />
-        <Info label="Commercial" value={p.commercial} />
+        <Info icon={<UserIcon className="h-3.5 w-3.5" />} label="Commercial" value={p.commercial} />
         <Info label="Créé le" value={formatDate(p.dateCreation)} />
         {p.derniereRelance && <Info label="Dernière relance" value={formatDate(p.derniereRelance)} />}
       </div>
@@ -441,10 +603,21 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+}) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+        {icon}
+        {label}
+      </div>
       <div className="font-medium">{value}</div>
     </div>
   );
