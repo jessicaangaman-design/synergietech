@@ -277,11 +277,21 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Fermer</Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            toast.success("Modifications enregistrées");
+            onClose();
+          }}
+        >
+          Enregistrer
+        </Button>
         {i.statut !== "Terminée" && (
           <Button
             onClick={() => {
               update(id, { statut: "Terminée" });
               toast.success("Intervention terminée");
+              onClose();
             }}
           >
             Marquer terminée
