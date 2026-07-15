@@ -112,7 +112,7 @@ export interface Intervention {
   materielRemplace?: boolean;
 }
 
-export type MembreRole = "commercial" | "technicien";
+export type MembreRole = "commercial" | "technicien" | "informaticien";
 
 export interface Membre {
   id: string;
@@ -133,19 +133,14 @@ const SEED_TECHNICIENS = [
   "Franck Bamba",
   "Désiré Koffi",
 ];
+const SEED_INFORMATICIENS = ["Sylvain Adou", "Nadia Coulibaly", "Rachid Doumbia"];
 
 // Backwards-compat exports (initial seed values, used only for seed data)
 export const COMMERCIAUX = SEED_COMMERCIAUX;
 export const TECHNICIENS = SEED_TECHNICIENS;
+export const INFORMATICIENS = SEED_INFORMATICIENS;
 
 function seedEquipe(): Membre[] {
-  const specs: Record<string, string> = {
-    "Ibrahim Traoré": "Vidéosurveillance & alarmes",
-    "Kouadio Yao": "Contrôle d'accès",
-    "Bakary Ouattara": "Radios & réseaux",
-    "Franck Bamba": "Incendie & télésurveillance",
-    "Désiré Koffi": "Clôtures & motorisation",
-  };
   return [
     ...SEED_COMMERCIAUX.map<Membre>((nom) => ({
       id: uid(),
@@ -159,13 +154,21 @@ function seedEquipe(): Membre[] {
       id: uid(),
       nom,
       role: "technicien",
-      specialite: specs[nom],
       email: nom.toLowerCase().replace(/[^a-z]+/g, ".") + "@sts.ci",
       telephone: "+225 05 00 00 00 00",
       actif: true,
     })),
+    ...SEED_INFORMATICIENS.map<Membre>((nom) => ({
+      id: uid(),
+      nom,
+      role: "informaticien",
+      email: nom.toLowerCase().replace(/[^a-z]+/g, ".") + "@sts.ci",
+      telephone: "+225 01 00 00 00 00",
+      actif: true,
+    })),
   ];
 }
+
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 

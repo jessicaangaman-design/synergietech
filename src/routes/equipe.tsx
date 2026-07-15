@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, UserCog, Wrench } from "lucide-react";
+import { Plus, Pencil, Trash2, UserCog, Wrench, Laptop } from "lucide-react";
 import { useStore, type Membre, type MembreRole } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -60,10 +60,13 @@ function EquipePage() {
 
   const commerciaux = useMemo(() => equipe.filter((m) => m.role === "commercial"), [equipe]);
   const techniciens = useMemo(() => equipe.filter((m) => m.role === "technicien"), [equipe]);
+  const informaticiens = useMemo(() => equipe.filter((m) => m.role === "informaticien"), [equipe]);
 
   const chargeCommercial = (nom: string) =>
     prospects.filter((p) => p.commercial === nom && p.statut !== "Perdu" && p.statut !== "Converti").length;
   const chargeTech = (nom: string) =>
+    interventions.filter((i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours")).length;
+  const chargeInfo = (nom: string) =>
     interventions.filter((i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours")).length;
 
   return (
@@ -137,6 +140,38 @@ function EquipePage() {
         </div>
       </section>
 
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Laptop className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Informaticiens ({informaticiens.length})
+            </h2>
+          </div>
+          <Button size="sm" onClick={() => setEditing({ mode: "create", role: "informaticien" })}>
+            <Plus className="h-4 w-4 mr-1.5" /> Nouvel informaticien
+          </Button>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {informaticiens.map((m) => (
+            <MembreCard
+              key={m.id}
+              m={m}
+              charge={chargeInfo(m.nom)}
+              chargeLabel="interventions en cours"
+              onEdit={() => setEditing({ mode: "edit", membre: m })}
+              onDelete={() => setToDelete(m)}
+              onToggle={(actif) => updateMembre(m.id, { actif })}
+            />
+          ))}
+          {informaticiens.length === 0 && (
+            <Card className="p-6 text-sm text-muted-foreground col-span-full">
+              Aucun informaticien. Cliquez sur « Nouvel informaticien ».
+            </Card>
+          )}
+        </div>
+      </section>
+
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         {editing && <MembreDialog editing={editing} onClose={() => setEditing(null)} />}
       </Dialog>
@@ -198,9 +233,6 @@ function MembreCard({
               </Badge>
             )}
           </div>
-          {m.specialite && (
-            <div className="text-xs text-muted-foreground mt-0.5">{m.specialite}</div>
-          )}
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
             {m.telephone && <div>📞 {m.telephone}</div>}
             {m.email && <div className="truncate">✉️ {m.email}</div>}
@@ -245,7 +277,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
           role: editing.role,
           telephone: "",
           email: "",
-          specialite: "",
           actif: true,
         };
 
@@ -254,9 +285,11 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
     role: initial.role,
     telephone: initial.telephone || "",
     email: initial.email || "",
-    specialite: initial.specialite || "",
     actif: initial.actif,
   });
+
+  const roleLabel = (r: MembreRole) =>
+    r === "commercial" ? "Commercial" : r === "technicien" ? "Technicien" : "Informaticien";
 
   const submit = () => {
     if (!f.nom.trim()) {
@@ -269,7 +302,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         role: f.role,
         telephone: f.telephone,
         email: f.email,
-        specialite: f.specialite,
         actif: f.actif,
       });
       toast.success("Membre mis à jour");
@@ -279,10 +311,9 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         role: f.role,
         telephone: f.telephone,
         email: f.email,
-        specialite: f.specialite,
         actif: f.actif,
       });
-      toast.success(`${f.role === "commercial" ? "Commercial" : "Technicien"} ajouté`);
+      toast.success(`${roleLabel(f.role)} ajouté`);
     }
     onClose();
   };
@@ -291,7 +322,7 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
     <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>
-          {isEdit ? "Modifier le membre" : `Nouveau ${f.role === "commercial" ? "commercial" : "technicien"}`}
+          {isEdit ? "Modifier le membre" : `Nouveau ${roleLabel(f.role).toLowerCase()}`}
         </DialogTitle>
         <DialogDescription>
           {isEdit
@@ -311,6 +342,7 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
             <SelectContent>
               <SelectItem value="commercial">Commercial</SelectItem>
               <SelectItem value="technicien">Technicien</SelectItem>
+              <SelectItem value="informaticien">Informaticien</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -323,18 +355,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
             <Label>Email</Label>
             <Input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
           </div>
-        </div>
-        <div>
-          <Label>Spécialité {f.role === "commercial" ? "(secteur)" : "(domaine technique)"}</Label>
-          <Input
-            placeholder={
-              f.role === "commercial"
-                ? "Ex. entreprises, résidentiel..."
-                : "Ex. vidéosurveillance, incendie..."
-            }
-            value={f.specialite}
-            onChange={(e) => setF({ ...f, specialite: e.target.value })}
-          />
         </div>
         <label className="flex items-center gap-2 text-sm mt-1">
           <Switch checked={f.actif} onCheckedChange={(v) => setF({ ...f, actif: v })} />
