@@ -385,17 +385,29 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   updateContrat: (id, patch) =>
     set((s) => ({ contrats: s.contrats.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
-  addLigne: (id, description, quantite) =>
+  addLigne: (id, description, quantite, prixUnitaire) =>
     set((s) => ({
-      contrats: s.contrats.map((c) =>
-        c.id === id ? { ...c, lignes: [...c.lignes, { id: uid(), description, quantite }] } : c,
-      ),
+      contrats: s.contrats.map((c) => {
+        if (c.id !== id) return c;
+        const lignes = [...c.lignes, { id: uid(), description, quantite, prixUnitaire }];
+        return { ...c, lignes, montant: totalLignes(lignes) };
+      }),
+    })),
+  updateLigne: (id, ligneId, patch) =>
+    set((s) => ({
+      contrats: s.contrats.map((c) => {
+        if (c.id !== id) return c;
+        const lignes = c.lignes.map((l) => (l.id === ligneId ? { ...l, ...patch } : l));
+        return { ...c, lignes, montant: totalLignes(lignes) };
+      }),
     })),
   removeLigne: (id, ligneId) =>
     set((s) => ({
-      contrats: s.contrats.map((c) =>
-        c.id === id ? { ...c, lignes: c.lignes.filter((l) => l.id !== ligneId) } : c,
-      ),
+      contrats: s.contrats.map((c) => {
+        if (c.id !== id) return c;
+        const lignes = c.lignes.filter((l) => l.id !== ligneId);
+        return { ...c, lignes, montant: totalLignes(lignes) };
+      }),
     })),
   addIntervention: (i) => set((s) => ({ interventions: [{ ...i, id: uid() }, ...s.interventions] })),
   updateIntervention: (id, patch) =>
