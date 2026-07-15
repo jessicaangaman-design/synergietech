@@ -233,9 +233,6 @@ function MembreCard({
               </Badge>
             )}
           </div>
-          {m.specialite && (
-            <div className="text-xs text-muted-foreground mt-0.5">{m.specialite}</div>
-          )}
           <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
             {m.telephone && <div>📞 {m.telephone}</div>}
             {m.email && <div className="truncate">✉️ {m.email}</div>}
