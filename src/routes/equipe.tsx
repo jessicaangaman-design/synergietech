@@ -277,7 +277,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
           role: editing.role,
           telephone: "",
           email: "",
-          specialite: "",
           actif: true,
         };
 
@@ -286,9 +285,11 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
     role: initial.role,
     telephone: initial.telephone || "",
     email: initial.email || "",
-    specialite: initial.specialite || "",
     actif: initial.actif,
   });
+
+  const roleLabel = (r: MembreRole) =>
+    r === "commercial" ? "Commercial" : r === "technicien" ? "Technicien" : "Informaticien";
 
   const submit = () => {
     if (!f.nom.trim()) {
@@ -301,7 +302,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         role: f.role,
         telephone: f.telephone,
         email: f.email,
-        specialite: f.specialite,
         actif: f.actif,
       });
       toast.success("Membre mis à jour");
@@ -311,10 +311,9 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         role: f.role,
         telephone: f.telephone,
         email: f.email,
-        specialite: f.specialite,
         actif: f.actif,
       });
-      toast.success(`${f.role === "commercial" ? "Commercial" : "Technicien"} ajouté`);
+      toast.success(`${roleLabel(f.role)} ajouté`);
     }
     onClose();
   };
