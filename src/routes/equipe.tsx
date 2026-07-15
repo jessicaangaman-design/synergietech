@@ -140,6 +140,38 @@ function EquipePage() {
         </div>
       </section>
 
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Laptop className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Informaticiens ({informaticiens.length})
+            </h2>
+          </div>
+          <Button size="sm" onClick={() => setEditing({ mode: "create", role: "informaticien" })}>
+            <Plus className="h-4 w-4 mr-1.5" /> Nouvel informaticien
+          </Button>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {informaticiens.map((m) => (
+            <MembreCard
+              key={m.id}
+              m={m}
+              charge={chargeInfo(m.nom)}
+              chargeLabel="interventions en cours"
+              onEdit={() => setEditing({ mode: "edit", membre: m })}
+              onDelete={() => setToDelete(m)}
+              onToggle={(actif) => updateMembre(m.id, { actif })}
+            />
+          ))}
+          {informaticiens.length === 0 && (
+            <Card className="p-6 text-sm text-muted-foreground col-span-full">
+              Aucun informaticien. Cliquez sur « Nouvel informaticien ».
+            </Card>
+          )}
+        </div>
+      </section>
+
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         {editing && <MembreDialog editing={editing} onClose={() => setEditing(null)} />}
       </Dialog>
