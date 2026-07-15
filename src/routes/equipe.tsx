@@ -322,7 +322,7 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
     <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>
-          {isEdit ? "Modifier le membre" : `Nouveau ${f.role === "commercial" ? "commercial" : "technicien"}`}
+          {isEdit ? "Modifier le membre" : `Nouveau ${roleLabel(f.role).toLowerCase()}`}
         </DialogTitle>
         <DialogDescription>
           {isEdit
