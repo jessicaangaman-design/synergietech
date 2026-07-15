@@ -177,12 +177,10 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label>Montant (FCFA)</Label>
-          <Input
-            type="number"
-            value={contrat.montant}
-            onChange={(e) => updateContrat(id, { montant: Number(e.target.value) })}
-          />
+          <Label>Montant total (calculé)</Label>
+          <div className="h-9 px-3 flex items-center rounded-md border border-input bg-muted/40 font-mono text-sm">
+            {formatFCFA(contrat.montant)}
+          </div>
         </div>
         <div>
           <Label>Statut</Label>
