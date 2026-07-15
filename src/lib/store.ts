@@ -300,7 +300,8 @@ interface StoreState {
   convertirProspect: (id: string) => string; // returns contrat id
   addContrat: (c: Omit<Contrat, "id" | "lignes"> & { lignes?: LigneContrat[] }) => string;
   updateContrat: (id: string, patch: Partial<Contrat>) => void;
-  addLigne: (id: string, description: string, quantite: number) => void;
+  addLigne: (id: string, description: string, quantite: number, prixUnitaire: number) => void;
+  updateLigne: (id: string, ligneId: string, patch: Partial<LigneContrat>) => void;
   removeLigne: (id: string, ligneId: string) => void;
   addIntervention: (i: Omit<Intervention, "id">) => void;
   updateIntervention: (id: string, patch: Partial<Intervention>) => void;
