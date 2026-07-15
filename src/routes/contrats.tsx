@@ -238,45 +238,96 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
       )}
 
       <div>
-        <Label className="text-sm mb-2 block">Équipements / services inclus</Label>
-        <div className="space-y-1.5 mb-2">
+        <Label className="text-sm mb-2 block">Devis — équipements & services</Label>
+        <div className="rounded-md border overflow-hidden">
+          <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+            <div>Désignation</div>
+            <div className="text-center">Qté</div>
+            <div className="text-right">P.U. (FCFA)</div>
+            <div className="text-right">Total</div>
+            <div />
+          </div>
           {contrat.lignes.map((l) => (
-            <div key={l.id} className="flex items-center gap-2 bg-muted/40 rounded px-2.5 py-1.5 text-sm">
-              <span className="text-xs font-mono bg-background rounded px-1.5 py-0.5">×{l.quantite}</span>
-              <span className="flex-1">{l.description}</span>
-              <button onClick={() => removeLigne(id, l.id)} className="text-muted-foreground hover:text-destructive">
+            <div
+              key={l.id}
+              className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-1.5 items-center border-t"
+            >
+              <Input
+                className="h-8"
+                value={l.description}
+                onChange={(e) => updateLigne(id, l.id, { description: e.target.value })}
+              />
+              <Input
+                type="number"
+                min={1}
+                className="h-8 text-center"
+                value={l.quantite}
+                onChange={(e) => updateLigne(id, l.id, { quantite: Number(e.target.value) })}
+              />
+              <Input
+                type="number"
+                min={0}
+                className="h-8 text-right font-mono"
+                value={l.prixUnitaire}
+                onChange={(e) => updateLigne(id, l.id, { prixUnitaire: Number(e.target.value) })}
+              />
+              <div className="text-right font-mono text-sm">{formatFCFA(l.quantite * l.prixUnitaire)}</div>
+              <button
+                onClick={() => removeLigne(id, l.id)}
+                className="text-muted-foreground hover:text-destructive justify-self-center"
+              >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           ))}
           {contrat.lignes.length === 0 && (
-            <div className="text-xs text-muted-foreground">Aucune ligne. Ajoutez du matériel ou une prestation.</div>
+            <div className="px-3 py-3 text-xs text-muted-foreground border-t">
+              Aucune ligne. Ajoutez du matériel ou une prestation ci-dessous.
+            </div>
           )}
+          <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 border-t bg-muted/30 items-center font-medium">
+            <div className="text-right text-sm">Total devis</div>
+            <div />
+            <div />
+            <div className="text-right font-mono text-sm text-primary">{formatFCFA(totalLignes(contrat.lignes))}</div>
+            <div />
+          </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex gap-2 mt-3">
+          <Input
+            placeholder="Désignation (ex : 4 caméras IP 4MP)"
+            value={newLigne.description}
+            onChange={(e) => setNewLigne({ ...newLigne, description: e.target.value })}
+          />
           <Input
             type="number"
             min={1}
             className="w-20"
+            placeholder="Qté"
             value={newLigne.quantite}
             onChange={(e) => setNewLigne({ ...newLigne, quantite: Number(e.target.value) })}
           />
           <Input
-            placeholder="Ex : 4 caméras IP 4MP"
-            value={newLigne.description}
-            onChange={(e) => setNewLigne({ ...newLigne, description: e.target.value })}
+            type="number"
+            min={0}
+            className="w-32"
+            placeholder="P.U."
+            value={newLigne.prixUnitaire}
+            onChange={(e) => setNewLigne({ ...newLigne, prixUnitaire: Number(e.target.value) })}
           />
           <Button
             onClick={() => {
               if (!newLigne.description.trim()) return;
-              addLigne(id, newLigne.description, newLigne.quantite);
-              setNewLigne({ description: "", quantite: 1 });
+              addLigne(id, newLigne.description, newLigne.quantite, newLigne.prixUnitaire);
+              setNewLigne({ description: "", quantite: 1, prixUnitaire: 0 });
             }}
           >
             Ajouter
           </Button>
         </div>
       </div>
+
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Fermer</Button>
