@@ -342,14 +342,27 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
     clientNom: "",
     type: "Installation ponctuelle" as ContratType,
     besoin: "vidéosurveillance" as BesoinType,
-    montant: 0,
     dureeMois: 12,
     statut: "Brouillon" as ContratStatut,
   });
+  const [lignes, setLignes] = useState<Omit<LigneContrat, "id">[]>([
+    { description: "", quantite: 1, prixUnitaire: 0 },
+  ]);
+  const total = lignes.reduce((s, l) => s + (l.quantite || 0) * (l.prixUnitaire || 0), 0);
+
+  const updateL = (i: number, patch: Partial<Omit<LigneContrat, "id">>) =>
+    setLignes((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  const removeL = (i: number) => setLignes((ls) => ls.filter((_, idx) => idx !== i));
+  const addL = () =>
+    setLignes((ls) => [...ls, { description: "", quantite: 1, prixUnitaire: 0 }]);
+
   return (
-    <DialogContent>
+    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>Nouveau contrat</DialogTitle>
+        <DialogTitle>Nouveau devis / contrat</DialogTitle>
+        <DialogDescription>
+          Le montant du contrat est calculé automatiquement à partir des lignes du devis.
+        </DialogDescription>
       </DialogHeader>
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
@@ -375,34 +388,103 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
           </Select>
         </div>
         <div>
-          <Label>Montant (FCFA)</Label>
-          <Input type="number" value={f.montant} onChange={(e) => setF({ ...f, montant: Number(e.target.value) })} />
-        </div>
-        <div>
           <Label>Durée (mois)</Label>
           <Input type="number" value={f.dureeMois} onChange={(e) => setF({ ...f, dureeMois: Number(e.target.value) })} />
         </div>
+        <div>
+          <Label>Statut initial</Label>
+          <Select value={f.statut} onValueChange={(v: ContratStatut) => setF({ ...f, statut: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {STATUTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
+
+      <div className="mt-2">
+        <div className="flex items-center justify-between mb-2">
+          <Label>Lignes du devis</Label>
+          <Button size="sm" variant="outline" onClick={addL}>
+            <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter une ligne
+          </Button>
+        </div>
+        <div className="rounded-md border overflow-hidden">
+          <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+            <div>Désignation</div>
+            <div className="text-center">Qté</div>
+            <div className="text-right">P.U. (FCFA)</div>
+            <div className="text-right">Total</div>
+            <div />
+          </div>
+          {lignes.map((l, i) => (
+            <div key={i} className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-1.5 items-center border-t">
+              <Input
+                className="h-8"
+                placeholder="Ex : 4 caméras IP 4MP"
+                value={l.description}
+                onChange={(e) => updateL(i, { description: e.target.value })}
+              />
+              <Input
+                type="number"
+                min={1}
+                className="h-8 text-center"
+                value={l.quantite}
+                onChange={(e) => updateL(i, { quantite: Number(e.target.value) })}
+              />
+              <Input
+                type="number"
+                min={0}
+                className="h-8 text-right font-mono"
+                value={l.prixUnitaire}
+                onChange={(e) => updateL(i, { prixUnitaire: Number(e.target.value) })}
+              />
+              <div className="text-right font-mono text-sm">{formatFCFA((l.quantite || 0) * (l.prixUnitaire || 0))}</div>
+              <button
+                onClick={() => removeL(i)}
+                className="text-muted-foreground hover:text-destructive justify-self-center"
+                aria-label="Supprimer la ligne"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 border-t bg-muted/30 items-center font-medium">
+            <div className="text-right text-sm">Total devis</div>
+            <div />
+            <div />
+            <div className="text-right font-mono text-sm text-primary">{formatFCFA(total)}</div>
+            <div />
+          </div>
+        </div>
+      </div>
+
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Annuler</Button>
         <Button
           onClick={() => {
             if (!f.clientNom) return toast.error("Nom du client requis");
+            const filtered = lignes
+              .filter((l) => l.description.trim() && l.quantite > 0)
+              .map((l) => ({ ...l, id: Math.random().toString(36).slice(2, 10) }));
             const now = new Date();
             const echeance = new Date(now);
             echeance.setMonth(echeance.getMonth() + (f.dureeMois || 6));
             addContrat({
               ...f,
+              montant: filtered.reduce((s, l) => s + l.quantite * l.prixUnitaire, 0),
               dateSignature: now.toISOString(),
               echeance: echeance.toISOString(),
-            } as Omit<Contrat, "id" | "lignes">);
-            toast.success("Contrat créé");
+              lignes: filtered,
+            } as Omit<Contrat, "id">);
+            toast.success("Contrat créé — CA dashboard mis à jour");
             onClose();
           }}
         >
-          Créer
+          Créer le devis
         </Button>
       </DialogFooter>
     </DialogContent>
   );
 }
+
