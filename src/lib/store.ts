@@ -214,20 +214,59 @@ function seedContrats(): Contrat[] {
     { clientNom: "STE Transbaobab", type: "Installation ponctuelle", besoin: "radio", montant: 1500000, dateSignature: daysAgo(50), dureeMois: 0, statut: "Actif", echeance: daysAhead(25) },
     { clientNom: "Cabinet Comptable KL", type: "Brouillon", besoin: "alarme", montant: 550000, dateSignature: daysAgo(2), dureeMois: 0, statut: "Brouillon", echeance: daysAhead(365) } as any,
   ];
-  const lignesMap: Record<string, string[]> = {
-    "vidéosurveillance": ["4 caméras IP 4MP", "NVR 8 canaux 2To", "Câblage et pose"],
-    "contrôle d'accès": ["2 lecteurs biométriques", "Centrale de contrôle", "20 badges RFID"],
-    "motorisation": ["Motorisation portail battant", "Télécommandes x4", "Cellule photoélectrique"],
-    "alarme": ["Centrale alarme filaire/radio", "6 détecteurs de mouvement", "Sirène extérieure"],
-    "incendie": ["Centrale incendie 4 zones", "8 détecteurs de fumée", "Sirène + flash"],
-    "clôture électrique": ["Clôture électrique 200m", "Électrificateur 8J", "Panneaux d'avertissement"],
-    "radio": ["10 talkies-walkies pro", "Base relais VHF", "Programmation & formation"],
+  const lignesMap: Record<string, { description: string; prixUnitaire: number; quantite?: number }[]> = {
+    "vidéosurveillance": [
+      { description: "Caméra IP 4MP", prixUnitaire: 85000, quantite: 4 },
+      { description: "NVR 8 canaux 2To", prixUnitaire: 320000 },
+      { description: "Câblage et pose (forfait)", prixUnitaire: 180000 },
+    ],
+    "contrôle d'accès": [
+      { description: "Lecteur biométrique", prixUnitaire: 220000, quantite: 2 },
+      { description: "Centrale de contrôle", prixUnitaire: 380000 },
+      { description: "Badge RFID", prixUnitaire: 3500, quantite: 20 },
+    ],
+    "motorisation": [
+      { description: "Motorisation portail battant", prixUnitaire: 950000 },
+      { description: "Télécommande", prixUnitaire: 25000, quantite: 4 },
+      { description: "Cellule photoélectrique", prixUnitaire: 65000 },
+    ],
+    "alarme": [
+      { description: "Centrale alarme filaire/radio", prixUnitaire: 380000 },
+      { description: "Détecteur de mouvement", prixUnitaire: 45000, quantite: 6 },
+      { description: "Sirène extérieure", prixUnitaire: 90000 },
+    ],
+    "incendie": [
+      { description: "Centrale incendie 4 zones", prixUnitaire: 480000 },
+      { description: "Détecteur de fumée", prixUnitaire: 35000, quantite: 8 },
+      { description: "Sirène + flash", prixUnitaire: 75000 },
+    ],
+    "clôture électrique": [
+      { description: "Clôture électrique (mètre linéaire)", prixUnitaire: 9500, quantite: 200 },
+      { description: "Électrificateur 8J", prixUnitaire: 420000 },
+      { description: "Panneaux d'avertissement", prixUnitaire: 8000, quantite: 6 },
+    ],
+    "radio": [
+      { description: "Talkie-walkie pro", prixUnitaire: 95000, quantite: 10 },
+      { description: "Base relais VHF", prixUnitaire: 550000 },
+      { description: "Programmation & formation (forfait)", prixUnitaire: 120000 },
+    ],
   };
-  return raw.map((c) => ({
-    ...c,
-    id: uid(),
-    lignes: (lignesMap[c.besoin] || []).map((d) => ({ id: uid(), description: d, quantite: 1 })),
-  }));
+  return raw.map((c) => {
+    const lignes = (lignesMap[c.besoin] || []).map((d) => ({
+      id: uid(),
+      description: d.description,
+      quantite: d.quantite ?? 1,
+      prixUnitaire: d.prixUnitaire,
+    }));
+    const montantCalc = totalLignes(lignes);
+    return {
+      ...c,
+      id: uid(),
+      lignes,
+      // ajuste le montant seed pour correspondre aux lignes si non-brouillon
+      montant: c.statut === "Brouillon" ? c.montant : montantCalc,
+    };
+  });
 }
 
 function seedInterventions(contrats: Contrat[]): Intervention[] {
