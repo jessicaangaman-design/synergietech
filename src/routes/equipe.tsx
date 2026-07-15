@@ -357,18 +357,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
             <Input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
           </div>
         </div>
-        <div>
-          <Label>Spécialité {f.role === "commercial" ? "(secteur)" : "(domaine technique)"}</Label>
-          <Input
-            placeholder={
-              f.role === "commercial"
-                ? "Ex. entreprises, résidentiel..."
-                : "Ex. vidéosurveillance, incendie..."
-            }
-            value={f.specialite}
-            onChange={(e) => setF({ ...f, specialite: e.target.value })}
-          />
-        </div>
         <label className="flex items-center gap-2 text-sm mt-1">
           <Switch checked={f.actif} onCheckedChange={(v) => setF({ ...f, actif: v })} />
           Membre actif (visible dans les listes déroulantes)
