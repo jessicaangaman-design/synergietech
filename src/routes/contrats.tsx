@@ -158,8 +158,9 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const contrat = useStore((s) => s.contrats.find((c) => c.id === id));
   const updateContrat = useStore((s) => s.updateContrat);
   const addLigne = useStore((s) => s.addLigne);
+  const updateLigne = useStore((s) => s.updateLigne);
   const removeLigne = useStore((s) => s.removeLigne);
-  const [newLigne, setNewLigne] = useState({ description: "", quantite: 1 });
+  const [newLigne, setNewLigne] = useState({ description: "", quantite: 1, prixUnitaire: 0 });
 
   if (!contrat) return null;
   const j = daysUntil(contrat.echeance);
