@@ -343,6 +343,7 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
             <SelectContent>
               <SelectItem value="commercial">Commercial</SelectItem>
               <SelectItem value="technicien">Technicien</SelectItem>
+              <SelectItem value="informaticien">Informaticien</SelectItem>
             </SelectContent>
           </Select>
         </div>
