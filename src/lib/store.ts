@@ -71,7 +71,11 @@ export interface LigneContrat {
   id: string;
   description: string;
   quantite: number;
+  prixUnitaire: number;
 }
+
+export const totalLignes = (lignes: LigneContrat[]) =>
+  lignes.reduce((s, l) => s + (l.quantite || 0) * (l.prixUnitaire || 0), 0);
 
 export interface Contrat {
   id: string;
