@@ -331,6 +331,14 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Fermer</Button>
+        <Button
+          onClick={() => {
+            toast.success("Contrat enregistré");
+            onClose();
+          }}
+        >
+          Enregistrer
+        </Button>
       </DialogFooter>
     </DialogContent>
   );
