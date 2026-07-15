@@ -11,6 +11,8 @@ import {
   type ContratType,
   type BesoinType,
   type Contrat,
+  type LigneContrat,
+  totalLignes,
 } from "@/lib/store";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
