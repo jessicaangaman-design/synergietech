@@ -60,10 +60,13 @@ function EquipePage() {
 
   const commerciaux = useMemo(() => equipe.filter((m) => m.role === "commercial"), [equipe]);
   const techniciens = useMemo(() => equipe.filter((m) => m.role === "technicien"), [equipe]);
+  const informaticiens = useMemo(() => equipe.filter((m) => m.role === "informaticien"), [equipe]);
 
   const chargeCommercial = (nom: string) =>
     prospects.filter((p) => p.commercial === nom && p.statut !== "Perdu" && p.statut !== "Converti").length;
   const chargeTech = (nom: string) =>
+    interventions.filter((i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours")).length;
+  const chargeInfo = (nom: string) =>
     interventions.filter((i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours")).length;
 
   return (
