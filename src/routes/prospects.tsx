@@ -23,6 +23,7 @@ import {
   type Source,
   type Prospect,
 } from "@/lib/store";
+import { validateName, validatePhone, validateEmail, formatPhone, stripDigits, sanitizePhoneInput } from "@/lib/validation";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
