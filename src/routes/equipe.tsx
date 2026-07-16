@@ -289,13 +289,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
           actif: true,
         };
 
-  const [f, setF] = useState({
-    nom: initial.nom,
-    role: initial.role,
-    telephone: initial.telephone || "",
-    email: initial.email || "",
-    actif: initial.actif,
-  });
 
   const initialPhone = splitPhone(initial.telephone || "");
   const [f, setF] = useState({
