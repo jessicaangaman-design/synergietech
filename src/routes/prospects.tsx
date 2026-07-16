@@ -428,13 +428,15 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
   const [f, setF] = useState({
     nom: "",
     entreprise: "",
-    telephone: "",
+    indicatif: "225",
+    numero: "",
     email: "",
     adresse: "",
     besoin: "vidéosurveillance" as BesoinType,
     source: "site web" as Source,
     commercial: commerciaux[0] ?? "",
   });
+  const [errors, setErrors] = useState<{ nom?: string; indicatif?: string; numero?: string; email?: string }>({});
   return (
     <DialogContent className="max-w-lg">
       <DialogHeader>
@@ -446,10 +448,15 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
           <Label>Nom complet *</Label>
           <Input
             value={f.nom}
-            onChange={(e) => setF({ ...f, nom: stripDigits(e.target.value) })}
+            onChange={(e) => {
+              setF({ ...f, nom: stripDigits(e.target.value) });
+              setErrors((er) => ({ ...er, nom: undefined }));
+            }}
             placeholder="Ex: Konan Aristide"
             maxLength={80}
+            aria-invalid={!!errors.nom}
           />
+          <FieldError message={errors.nom} />
         </div>
         <div className="col-span-2">
           <Label>Entreprise</Label>
@@ -459,25 +466,35 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
             maxLength={120}
           />
         </div>
-        <div>
-          <Label>Téléphone *</Label>
-          <Input
-            value={f.telephone}
-            onChange={(e) => setF({ ...f, telephone: sanitizePhoneInput(e.target.value) })}
-            placeholder="+225 07 00 00 00 00"
-            inputMode="tel"
-            maxLength={25}
-          />
-        </div>
-        <div>
+        <PhoneField
+          required
+          indicatif={f.indicatif}
+          national={f.numero}
+          onIndicatifChange={(v) => {
+            setF({ ...f, indicatif: v });
+            setErrors((er) => ({ ...er, indicatif: undefined }));
+          }}
+          onNationalChange={(v) => {
+            setF({ ...f, numero: v });
+            setErrors((er) => ({ ...er, numero: undefined }));
+          }}
+          indicatifError={errors.indicatif}
+          nationalError={errors.numero}
+        />
+        <div className="col-span-2">
           <Label>Email</Label>
           <Input
             type="email"
             value={f.email}
-            onChange={(e) => setF({ ...f, email: e.target.value })}
+            onChange={(e) => {
+              setF({ ...f, email: e.target.value });
+              setErrors((er) => ({ ...er, email: undefined }));
+            }}
             placeholder="nom@exemple.com"
             maxLength={254}
+            aria-invalid={!!errors.email}
           />
+          <FieldError message={errors.email} />
         </div>
         <div className="col-span-2">
           <Label>Adresse</Label>
@@ -522,15 +539,22 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
         <Button
           onClick={() => {
             const nomErr = validateName(f.nom, "Nom");
-            if (nomErr) { toast.error(nomErr); return; }
-            const telErr = validatePhone(f.telephone, true);
-            if (telErr) { toast.error(telErr); return; }
+            const indErr = validateDialCode(f.indicatif);
+            const numErr = validateNationalNumber(f.numero, true);
             const emailErr = validateEmail(f.email, false);
-            if (emailErr) { toast.error(emailErr); return; }
+            setErrors({
+              nom: nomErr || undefined,
+              indicatif: indErr || undefined,
+              numero: numErr || undefined,
+              email: emailErr || undefined,
+            });
+            if (nomErr || indErr || numErr || emailErr) return;
+            const { indicatif, numero, ...rest } = f;
+            void indicatif; void numero;
             addProspect({
-              ...f,
+              ...rest,
               nom: f.nom.trim(),
-              telephone: formatPhone(f.telephone),
+              telephone: composePhone(f.indicatif, f.numero),
               email: f.email.trim(),
               entreprise: f.entreprise.trim(),
               adresse: f.adresse.trim(),
