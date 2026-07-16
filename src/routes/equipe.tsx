@@ -331,7 +331,12 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
       <div className="grid gap-3">
         <div>
           <Label>Nom complet *</Label>
-          <Input value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} />
+          <Input
+            value={f.nom}
+            onChange={(e) => setF({ ...f, nom: stripDigits(e.target.value) })}
+            placeholder="Ex: Kouassi Yves"
+            maxLength={80}
+          />
         </div>
         <div>
           <Label>Rôle</Label>
@@ -347,7 +352,13 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Téléphone</Label>
-            <Input value={f.telephone} onChange={(e) => setF({ ...f, telephone: e.target.value })} />
+            <Input
+              value={f.telephone}
+              onChange={(e) => setF({ ...f, telephone: sanitizePhoneInput(e.target.value) })}
+              placeholder="+225 07 00 00 00 00"
+              inputMode="tel"
+              maxLength={25}
+            />
           </div>
           <div>
             <Label>Email</Label>
