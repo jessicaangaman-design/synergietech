@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, UserCog, Wrench, Laptop } from "lucide-react";
 import { useStore, type Membre, type MembreRole } from "@/lib/store";
+import { validateName, validatePhone, validateEmail, formatPhone, stripDigits, sanitizePhoneInput } from "@/lib/validation";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -292,27 +293,24 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
     r === "commercial" ? "Commercial" : r === "technicien" ? "Technicien" : "Informaticien";
 
   const submit = () => {
-    if (!f.nom.trim()) {
-      toast.error("Le nom est obligatoire");
-      return;
-    }
+    const nomErr = validateName(f.nom, "Nom");
+    if (nomErr) { toast.error(nomErr); return; }
+    const telErr = validatePhone(f.telephone, false);
+    if (telErr) { toast.error(telErr); return; }
+    const emailErr = validateEmail(f.email, false);
+    if (emailErr) { toast.error(emailErr); return; }
+    const payload = {
+      nom: f.nom.trim(),
+      role: f.role,
+      telephone: f.telephone ? formatPhone(f.telephone) : "",
+      email: f.email.trim(),
+      actif: f.actif,
+    };
     if (isEdit) {
-      updateMembre(initial.id, {
-        nom: f.nom.trim(),
-        role: f.role,
-        telephone: f.telephone,
-        email: f.email,
-        actif: f.actif,
-      });
+      updateMembre(initial.id, payload);
       toast.success("Membre mis à jour");
     } else {
-      addMembre({
-        nom: f.nom.trim(),
-        role: f.role,
-        telephone: f.telephone,
-        email: f.email,
-        actif: f.actif,
-      });
+      addMembre(payload);
       toast.success(`${roleLabel(f.role)} ajouté`);
     }
     onClose();
@@ -333,7 +331,12 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
       <div className="grid gap-3">
         <div>
           <Label>Nom complet *</Label>
-          <Input value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} />
+          <Input
+            value={f.nom}
+            onChange={(e) => setF({ ...f, nom: stripDigits(e.target.value) })}
+            placeholder="Ex: Kouassi Yves"
+            maxLength={80}
+          />
         </div>
         <div>
           <Label>Rôle</Label>
@@ -349,11 +352,23 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Téléphone</Label>
-            <Input value={f.telephone} onChange={(e) => setF({ ...f, telephone: e.target.value })} />
+            <Input
+              value={f.telephone}
+              onChange={(e) => setF({ ...f, telephone: sanitizePhoneInput(e.target.value) })}
+              placeholder="+225 07 00 00 00 00"
+              inputMode="tel"
+              maxLength={25}
+            />
           </div>
           <div>
             <Label>Email</Label>
-            <Input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+            <Input
+              type="email"
+              value={f.email}
+              onChange={(e) => setF({ ...f, email: e.target.value })}
+              placeholder="nom@exemple.com"
+              maxLength={254}
+            />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm mt-1">

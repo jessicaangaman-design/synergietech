@@ -23,6 +23,7 @@ import {
   type Source,
   type Prospect,
 } from "@/lib/store";
+import { validateName, validatePhone, validateEmail, formatPhone, stripDigits, sanitizePhoneInput } from "@/lib/validation";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -436,22 +437,40 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <Label>Nom complet *</Label>
-          <Input value={f.nom} onChange={(e) => setF({ ...f, nom: e.target.value })} />
+          <Input
+            value={f.nom}
+            onChange={(e) => setF({ ...f, nom: stripDigits(e.target.value) })}
+            placeholder="Ex: Konan Aristide"
+            maxLength={80}
+          />
         </div>
         <div className="col-span-2">
           <Label>Entreprise</Label>
           <Input
             value={f.entreprise}
             onChange={(e) => setF({ ...f, entreprise: e.target.value })}
+            maxLength={120}
           />
         </div>
         <div>
           <Label>Téléphone *</Label>
-          <Input value={f.telephone} onChange={(e) => setF({ ...f, telephone: e.target.value })} />
+          <Input
+            value={f.telephone}
+            onChange={(e) => setF({ ...f, telephone: sanitizePhoneInput(e.target.value) })}
+            placeholder="+225 07 00 00 00 00"
+            inputMode="tel"
+            maxLength={25}
+          />
         </div>
         <div>
           <Label>Email</Label>
-          <Input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+          <Input
+            type="email"
+            value={f.email}
+            onChange={(e) => setF({ ...f, email: e.target.value })}
+            placeholder="nom@exemple.com"
+            maxLength={254}
+          />
         </div>
         <div className="col-span-2">
           <Label>Adresse</Label>
@@ -495,11 +514,20 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
         <Button variant="outline" onClick={onClose}>Annuler</Button>
         <Button
           onClick={() => {
-            if (!f.nom || !f.telephone) {
-              toast.error("Nom et téléphone requis");
-              return;
-            }
-            addProspect(f);
+            const nomErr = validateName(f.nom, "Nom");
+            if (nomErr) { toast.error(nomErr); return; }
+            const telErr = validatePhone(f.telephone, true);
+            if (telErr) { toast.error(telErr); return; }
+            const emailErr = validateEmail(f.email, false);
+            if (emailErr) { toast.error(emailErr); return; }
+            addProspect({
+              ...f,
+              nom: f.nom.trim(),
+              telephone: formatPhone(f.telephone),
+              email: f.email.trim(),
+              entreprise: f.entreprise.trim(),
+              adresse: f.adresse.trim(),
+            });
             toast.success("Prospect créé");
             onClose();
           }}
