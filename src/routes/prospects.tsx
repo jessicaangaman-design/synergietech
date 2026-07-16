@@ -514,11 +514,20 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
         <Button variant="outline" onClick={onClose}>Annuler</Button>
         <Button
           onClick={() => {
-            if (!f.nom || !f.telephone) {
-              toast.error("Nom et téléphone requis");
-              return;
-            }
-            addProspect(f);
+            const nomErr = validateName(f.nom, "Nom");
+            if (nomErr) { toast.error(nomErr); return; }
+            const telErr = validatePhone(f.telephone, true);
+            if (telErr) { toast.error(telErr); return; }
+            const emailErr = validateEmail(f.email, false);
+            if (emailErr) { toast.error(emailErr); return; }
+            addProspect({
+              ...f,
+              nom: f.nom.trim(),
+              telephone: formatPhone(f.telephone),
+              email: f.email.trim(),
+              entreprise: f.entreprise.trim(),
+              adresse: f.adresse.trim(),
+            });
             toast.success("Prospect créé");
             onClose();
           }}
