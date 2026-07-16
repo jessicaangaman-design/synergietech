@@ -362,7 +362,13 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
           </div>
           <div>
             <Label>Email</Label>
-            <Input value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+            <Input
+              type="email"
+              value={f.email}
+              onChange={(e) => setF({ ...f, email: e.target.value })}
+              placeholder="nom@exemple.com"
+              maxLength={254}
+            />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm mt-1">
