@@ -292,27 +292,24 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
     r === "commercial" ? "Commercial" : r === "technicien" ? "Technicien" : "Informaticien";
 
   const submit = () => {
-    if (!f.nom.trim()) {
-      toast.error("Le nom est obligatoire");
-      return;
-    }
+    const nomErr = validateName(f.nom, "Nom");
+    if (nomErr) { toast.error(nomErr); return; }
+    const telErr = validatePhone(f.telephone, false);
+    if (telErr) { toast.error(telErr); return; }
+    const emailErr = validateEmail(f.email, false);
+    if (emailErr) { toast.error(emailErr); return; }
+    const payload = {
+      nom: f.nom.trim(),
+      role: f.role,
+      telephone: f.telephone ? formatPhone(f.telephone) : "",
+      email: f.email.trim(),
+      actif: f.actif,
+    };
     if (isEdit) {
-      updateMembre(initial.id, {
-        nom: f.nom.trim(),
-        role: f.role,
-        telephone: f.telephone,
-        email: f.email,
-        actif: f.actif,
-      });
+      updateMembre(initial.id, payload);
       toast.success("Membre mis à jour");
     } else {
-      addMembre({
-        nom: f.nom.trim(),
-        role: f.role,
-        telephone: f.telephone,
-        email: f.email,
-        actif: f.actif,
-      });
+      addMembre(payload);
       toast.success(`${roleLabel(f.role)} ajouté`);
     }
     onClose();
