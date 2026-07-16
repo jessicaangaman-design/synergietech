@@ -2,7 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, UserCog, Wrench, Laptop } from "lucide-react";
 import { useStore, type Membre, type MembreRole } from "@/lib/store";
-import { validateName, validatePhone, validateEmail, formatPhone, stripDigits, sanitizePhoneInput } from "@/lib/validation";
+import { validateName, validateEmail, stripDigits } from "@/lib/validation";
+import {
+  PhoneField,
+  FieldError,
+  composePhone,
+  splitPhone,
+  validateDialCode,
+  validateNationalNumber,
+} from "@/components/PhoneField";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -281,28 +289,43 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
           actif: true,
         };
 
+
+  const initialPhone = splitPhone(initial.telephone || "");
   const [f, setF] = useState({
     nom: initial.nom,
     role: initial.role,
-    telephone: initial.telephone || "",
+    indicatif: initialPhone.indicatif,
+    numero: initialPhone.national,
     email: initial.email || "",
     actif: initial.actif,
   });
+  const [errors, setErrors] = useState<{ nom?: string; indicatif?: string; numero?: string; email?: string }>({});
 
   const roleLabel = (r: MembreRole) =>
     r === "commercial" ? "Commercial" : r === "technicien" ? "Technicien" : "Informaticien";
 
+  const validateAll = () => {
+    const nom = validateName(f.nom, "Nom");
+    const hasPhone = f.indicatif.length > 0 || f.numero.length > 0;
+    const indicatif = hasPhone ? validateDialCode(f.indicatif) : null;
+    const numero = hasPhone ? validateNationalNumber(f.numero, true) : null;
+    const email = validateEmail(f.email, false);
+    const next = {
+      nom: nom || undefined,
+      indicatif: indicatif || undefined,
+      numero: numero || undefined,
+      email: email || undefined,
+    };
+    setErrors(next);
+    return !nom && !indicatif && !numero && !email;
+  };
+
   const submit = () => {
-    const nomErr = validateName(f.nom, "Nom");
-    if (nomErr) { toast.error(nomErr); return; }
-    const telErr = validatePhone(f.telephone, false);
-    if (telErr) { toast.error(telErr); return; }
-    const emailErr = validateEmail(f.email, false);
-    if (emailErr) { toast.error(emailErr); return; }
+    if (!validateAll()) return;
     const payload = {
       nom: f.nom.trim(),
       role: f.role,
-      telephone: f.telephone ? formatPhone(f.telephone) : "",
+      telephone: composePhone(f.indicatif, f.numero),
       email: f.email.trim(),
       actif: f.actif,
     };
@@ -333,10 +356,16 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
           <Label>Nom complet *</Label>
           <Input
             value={f.nom}
-            onChange={(e) => setF({ ...f, nom: stripDigits(e.target.value) })}
+            onChange={(e) => {
+              const v = stripDigits(e.target.value);
+              setF({ ...f, nom: v });
+              setErrors((er) => ({ ...er, nom: undefined }));
+            }}
             placeholder="Ex: Kouassi Yves"
             maxLength={80}
+            aria-invalid={!!errors.nom}
           />
+          <FieldError message={errors.nom} />
         </div>
         <div>
           <Label>Rôle</Label>
@@ -349,27 +378,34 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
             </SelectContent>
           </Select>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>Téléphone</Label>
-            <Input
-              value={f.telephone}
-              onChange={(e) => setF({ ...f, telephone: sanitizePhoneInput(e.target.value) })}
-              placeholder="+225 07 00 00 00 00"
-              inputMode="tel"
-              maxLength={25}
-            />
-          </div>
-          <div>
-            <Label>Email</Label>
-            <Input
-              type="email"
-              value={f.email}
-              onChange={(e) => setF({ ...f, email: e.target.value })}
-              placeholder="nom@exemple.com"
-              maxLength={254}
-            />
-          </div>
+        <PhoneField
+          indicatif={f.indicatif}
+          national={f.numero}
+          onIndicatifChange={(v) => {
+            setF({ ...f, indicatif: v });
+            setErrors((er) => ({ ...er, indicatif: undefined }));
+          }}
+          onNationalChange={(v) => {
+            setF({ ...f, numero: v });
+            setErrors((er) => ({ ...er, numero: undefined }));
+          }}
+          indicatifError={errors.indicatif}
+          nationalError={errors.numero}
+        />
+        <div>
+          <Label>Email</Label>
+          <Input
+            type="email"
+            value={f.email}
+            onChange={(e) => {
+              setF({ ...f, email: e.target.value });
+              setErrors((er) => ({ ...er, email: undefined }));
+            }}
+            placeholder="nom@exemple.com"
+            maxLength={254}
+            aria-invalid={!!errors.email}
+          />
+          <FieldError message={errors.email} />
         </div>
         <label className="flex items-center gap-2 text-sm mt-1">
           <Switch checked={f.actif} onCheckedChange={(v) => setF({ ...f, actif: v })} />
