@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, UserCog, Wrench, Laptop } from "lucide-react";
-import { useStore, type Membre, type MembreRole } from "@/lib/store";
+import type { Membre, MembreRole } from "@/types";
+import { useEquipe, useEquipeActions } from "@/features/equipe/api/use-equipe";
+import { useInterventions } from "@/features/interventions/api/use-interventions";
+import { useProspects } from "@/features/prospects/api/use-prospects";
 import { validateName, validateEmail, stripDigits } from "@/lib/validation";
 import {
   PhoneField,
@@ -45,24 +47,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/equipe")({
-  component: EquipePage,
-  head: () => ({
-    meta: [
-      { title: "Équipe — STS SARL" },
-      { name: "description", content: "Gestion des commerciaux et techniciens" },
-    ],
-  }),
-});
-
 type Editing = { mode: "create"; role: MembreRole } | { mode: "edit"; membre: Membre } | null;
 
-function EquipePage() {
-  const equipe = useStore((s) => s.equipe);
-  const prospects = useStore((s) => s.prospects);
-  const interventions = useStore((s) => s.interventions);
-  const removeMembre = useStore((s) => s.removeMembre);
-  const updateMembre = useStore((s) => s.updateMembre);
+export function EquipePage() {
+  const { equipe } = useEquipe();
+  const { prospects } = useProspects();
+  const { interventions } = useInterventions();
+  const { removeMembre, updateMembre } = useEquipeActions();
 
   const [editing, setEditing] = useState<Editing>(null);
   const [toDelete, setToDelete] = useState<Membre | null>(null);
@@ -72,18 +63,20 @@ function EquipePage() {
   const informaticiens = useMemo(() => equipe.filter((m) => m.role === "informaticien"), [equipe]);
 
   const chargeCommercial = (nom: string) =>
-    prospects.filter((p) => p.commercial === nom && p.statut !== "Perdu" && p.statut !== "Converti").length;
+    prospects.filter((p) => p.commercial === nom && p.statut !== "Perdu" && p.statut !== "Converti")
+      .length;
   const chargeTech = (nom: string) =>
-    interventions.filter((i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours")).length;
+    interventions.filter(
+      (i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours"),
+    ).length;
   const chargeInfo = (nom: string) =>
-    interventions.filter((i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours")).length;
+    interventions.filter(
+      (i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours"),
+    ).length;
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
-      <PageHeader
-        title="Équipe"
-        subtitle="Gérez les commerciaux et techniciens de STS SARL"
-      />
+      <PageHeader title="Équipe" subtitle="Gérez les commerciaux et techniciens de STS SARL" />
 
       <section>
         <div className="flex items-center justify-between mb-3">
@@ -273,9 +266,14 @@ function MembreCard({
   );
 }
 
-function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; onClose: () => void }) {
-  const addMembre = useStore((s) => s.addMembre);
-  const updateMembre = useStore((s) => s.updateMembre);
+function MembreDialog({
+  editing,
+  onClose,
+}: {
+  editing: Exclude<Editing, null>;
+  onClose: () => void;
+}) {
+  const { addMembre, updateMembre } = useEquipeActions();
   const isEdit = editing.mode === "edit";
   const initial: Membre =
     editing.mode === "edit"
@@ -289,7 +287,6 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
           actif: true,
         };
 
-
   const initialPhone = splitPhone(initial.telephone || "");
   const [f, setF] = useState({
     nom: initial.nom,
@@ -299,7 +296,12 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
     email: initial.email || "",
     actif: initial.actif,
   });
-  const [errors, setErrors] = useState<{ nom?: string; indicatif?: string; numero?: string; email?: string }>({});
+  const [errors, setErrors] = useState<{
+    nom?: string;
+    indicatif?: string;
+    numero?: string;
+    email?: string;
+  }>({});
 
   const roleLabel = (r: MembreRole) =>
     r === "commercial" ? "Commercial" : r === "technicien" ? "Technicien" : "Informaticien";
@@ -370,7 +372,9 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         <div>
           <Label>Rôle</Label>
           <Select value={f.role} onValueChange={(v: MembreRole) => setF({ ...f, role: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="commercial">Commercial</SelectItem>
               <SelectItem value="technicien">Technicien</SelectItem>
@@ -413,7 +417,9 @@ function MembreDialog({ editing, onClose }: { editing: Exclude<Editing, null>; o
         </label>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Annuler</Button>
+        <Button variant="outline" onClick={onClose}>
+          Annuler
+        </Button>
         <Button onClick={submit}>{isEdit ? "Enregistrer" : "Ajouter"}</Button>
       </DialogFooter>
     </DialogContent>

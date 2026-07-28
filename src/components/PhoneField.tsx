@@ -87,7 +87,9 @@ export function PhoneField({
       <div className="grid grid-cols-[110px_1fr] gap-2">
         <div>
           <div className="relative">
-            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+</span>
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+              +
+            </span>
             <Input
               value={indicatif}
               onChange={(e) => onIndicatifChange(e.target.value.replace(/\D/g, "").slice(0, 3))}
@@ -103,7 +105,9 @@ export function PhoneField({
         <div>
           <Input
             value={national}
-            onChange={(e) => onNationalChange(e.target.value.replace(/[^\d\s().-]/g, "").slice(0, 20))}
+            onChange={(e) =>
+              onNationalChange(e.target.value.replace(/[^\d\s().-]/g, "").slice(0, 20))
+            }
             placeholder="07 00 00 00 00"
             inputMode="tel"
             aria-invalid={!!nationalError}

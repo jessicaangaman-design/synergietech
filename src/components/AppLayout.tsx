@@ -1,24 +1,80 @@
-import { Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { LayoutDashboard, Users, FileText, Wrench, RotateCcw, Menu, X, UserCog } from "lucide-react";
+import {
+  Building2,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  UserCog,
+  Users,
+  Wrench,
+  X,
+} from "lucide-react";
+import { useSWRConfig } from "swr";
+
 import logoSts from "@/assets/logo-sts.jpg.asset.json";
-
-import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-
-const NAV = [
-  { to: "/", label: "Tableau de bord", icon: LayoutDashboard },
-  { to: "/prospects", label: "Prospects", icon: Users },
-  { to: "/contrats", label: "Contrats", icon: FileText },
-  { to: "/interventions", label: "Interventions", icon: Wrench },
-  { to: "/equipe", label: "Équipe", icon: UserCog },
-] as const;
+import useAuth from "@/hooks/authUser";
 
 export function AppLayout() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const reset = useStore((s) => s.reset);
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { mutate } = useSWRConfig();
+  const logout = useAuth((state) => state.logout);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const basePath = pathname.startsWith("/secretaire")
+    ? "/secretaire"
+    : pathname.startsWith("/technicien")
+      ? "/technicien"
+      : "/admin";
+
+  const navItems =
+    basePath === "/technicien"
+      ? [
+          {
+            to: `${basePath}/interventions`,
+            label: "Interventions",
+            icon: Wrench,
+          },
+        ]
+      : [
+          {
+            to: `${basePath}/home`,
+            label: "Tableau de bord",
+            icon: LayoutDashboard,
+          },
+          {
+            to: `${basePath}/prospects`,
+            label: "Prospects",
+            icon: Users,
+          },
+          {
+            to: `${basePath}/contracts`,
+            label: "Contrats",
+            icon: FileText,
+          },
+          ...(basePath === "/admin"
+            ? [
+                {
+                  to: `${basePath}/clients`,
+                  label: "Clients",
+                  icon: Building2,
+                },
+              ]
+            : []),
+          {
+            to: `${basePath}/interventions`,
+            label: "Interventions",
+            icon: Wrench,
+          },
+          {
+            to: `${basePath}/equipes`,
+            label: "Équipe",
+            icon: UserCog,
+          },
+        ];
 
   const NavContent = (
     <>
@@ -42,8 +98,8 @@ export function AppLayout() {
         </button>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {NAV.map((n) => {
-          const active = n.to === "/" ? pathname === "/" : pathname.startsWith(n.to);
+        {navItems.map((n) => {
+          const active = pathname === n.to || pathname.startsWith(`${n.to}/`);
           return (
             <Link
               key={n.to}
@@ -65,17 +121,18 @@ export function AppLayout() {
         <Button
           variant="ghost"
           size="sm"
-          className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/60"
+          className="mb-3 w-full justify-start text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
           onClick={() => {
-            reset();
-            toast.success("Données réinitialisées");
+            logout();
+            void mutate(() => true, undefined, { revalidate: false });
+            navigate("/", { replace: true });
           }}
         >
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Réinitialiser les données
+          <LogOut className="mr-2 h-4 w-4" />
+          Se déconnecter
         </Button>
-        <div className="mt-3 text-[10px] text-sidebar-foreground/50 px-2">
-          Prototype · données en mémoire · Cocody Angré, Abidjan
+        <div className="text-[10px] text-sidebar-foreground/50 px-2">
+          Application connectée à l’API · Cocody Angré, Abidjan
         </div>
       </div>
     </>
@@ -91,10 +148,7 @@ export function AppLayout() {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setMobileOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <aside className="relative flex w-72 max-w-[85vw] flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
             {NavContent}
           </aside>

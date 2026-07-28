@@ -1,14 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Plus, CalendarDays, List } from "lucide-react";
+import { type Intervention, type InterventionStatut, type InterventionType } from "@/types";
+import { useContrats } from "@/features/contrats/api/use-contrats";
+import { useEquipe } from "@/features/equipe/api/use-equipe";
 import {
-  useStore,
-  formatDateTime,
-  formatDate,
-  type Intervention,
-  type InterventionStatut,
-  type InterventionType,
-} from "@/lib/store";
+  useIntervention,
+  useInterventionActions,
+  useInterventions,
+} from "@/features/interventions/api/use-interventions";
+import { formatDate, formatDateTime } from "@/lib/formatters";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,11 +44,12 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/interventions")({
-  component: InterventionsPage,
-});
-
-const TYPES: InterventionType[] = ["Installation", "Maintenance préventive", "Dépannage", "Contrôle périodique"];
+const TYPES: InterventionType[] = [
+  "Installation",
+  "Maintenance préventive",
+  "Dépannage",
+  "Contrôle périodique",
+];
 const STATUTS: InterventionStatut[] = ["Planifiée", "En cours", "Terminée", "Annulée"];
 
 const STATUT_STYLE: Record<InterventionStatut, string> = {
@@ -58,8 +59,8 @@ const STATUT_STYLE: Record<InterventionStatut, string> = {
   Annulée: "bg-muted text-muted-foreground",
 };
 
-function InterventionsPage() {
-  const interventions = useStore((s) => s.interventions);
+export function InterventionsPage() {
+  const { interventions } = useInterventions();
   const [openNew, setOpenNew] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
 
@@ -76,7 +77,9 @@ function InterventionsPage() {
         actions={
           <Dialog open={openNew} onOpenChange={setOpenNew}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-1.5" /> Nouvelle intervention</Button>
+              <Button>
+                <Plus className="h-4 w-4 mr-1.5" /> Nouvelle intervention
+              </Button>
             </DialogTrigger>
             <NewInterventionDialog onClose={() => setOpenNew(false)} />
           </Dialog>
@@ -85,8 +88,12 @@ function InterventionsPage() {
 
       <Tabs defaultValue="liste">
         <TabsList>
-          <TabsTrigger value="liste"><List className="h-4 w-4 mr-1.5" /> Liste</TabsTrigger>
-          <TabsTrigger value="cal"><CalendarDays className="h-4 w-4 mr-1.5" /> Semaine</TabsTrigger>
+          <TabsTrigger value="liste">
+            <List className="h-4 w-4 mr-1.5" /> Liste
+          </TabsTrigger>
+          <TabsTrigger value="cal">
+            <CalendarDays className="h-4 w-4 mr-1.5" /> Semaine
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="liste">
@@ -104,12 +111,16 @@ function InterventionsPage() {
               <TableBody>
                 {sorted.map((i) => (
                   <TableRow key={i.id} onClick={() => setDetailId(i.id)} className="cursor-pointer">
-                    <TableCell className="text-xs whitespace-nowrap">{formatDateTime(i.dateHeure)}</TableCell>
+                    <TableCell className="text-xs whitespace-nowrap">
+                      {formatDateTime(i.dateHeure)}
+                    </TableCell>
                     <TableCell className="font-medium">{i.clientNom}</TableCell>
                     <TableCell className="text-xs">{i.type}</TableCell>
                     <TableCell className="text-xs">{i.technicien}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={STATUT_STYLE[i.statut]}>{i.statut}</Badge>
+                      <Badge variant="outline" className={STATUT_STYLE[i.statut]}>
+                        {i.statut}
+                      </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -131,7 +142,7 @@ function InterventionsPage() {
 }
 
 function WeekCalendar({ onOpen }: { onOpen: (id: string) => void }) {
-  const interventions = useStore((s) => s.interventions);
+  const { interventions } = useInterventions();
   const [offset, setOffset] = useState(0);
 
   const start = useMemo(() => {
@@ -155,9 +166,15 @@ function WeekCalendar({ onOpen }: { onOpen: (id: string) => void }) {
           Semaine du {formatDate(days[0].toISOString())} au {formatDate(days[6].toISOString())}
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setOffset(offset - 1)}>← Précédente</Button>
-          <Button variant="outline" size="sm" onClick={() => setOffset(0)}>Cette semaine</Button>
-          <Button variant="outline" size="sm" onClick={() => setOffset(offset + 1)}>Suivante →</Button>
+          <Button variant="outline" size="sm" onClick={() => setOffset(offset - 1)}>
+            ← Précédente
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setOffset(0)}>
+            Cette semaine
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setOffset(offset + 1)}>
+            Suivante →
+          </Button>
         </div>
       </div>
       <div className="grid grid-cols-7 gap-2">
@@ -182,9 +199,16 @@ function WeekCalendar({ onOpen }: { onOpen: (id: string) => void }) {
                     >
                       <div className="font-medium truncate">{i.clientNom}</div>
                       <div className="text-muted-foreground">
-                        {new Date(i.dateHeure).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {i.type}
+                        {new Date(i.dateHeure).toLocaleTimeString("fr-FR", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        · {i.type}
                       </div>
-                      <Badge variant="outline" className={`${STATUT_STYLE[i.statut]} mt-1 text-[9px]`}>
+                      <Badge
+                        variant="outline"
+                        className={`${STATUT_STYLE[i.statut]} mt-1 text-[9px]`}
+                      >
                         {i.statut}
                       </Badge>
                     </button>
@@ -200,9 +224,9 @@ function WeekCalendar({ onOpen }: { onOpen: (id: string) => void }) {
 }
 
 function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }) {
-  const i = useStore((s) => s.interventions.find((x) => x.id === id));
-  const update = useStore((s) => s.updateIntervention);
-  const equipe = useStore((s) => s.equipe);
+  const { intervention: i } = useIntervention(id);
+  const { updateIntervention: update } = useInterventionActions();
+  const { equipe } = useEquipe();
   const techniciens = useMemo(
     () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
     [equipe],
@@ -214,27 +238,46 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           {i.clientNom}
-          <Badge variant="outline" className={STATUT_STYLE[i.statut]}>{i.statut}</Badge>
+          <Badge variant="outline" className={STATUT_STYLE[i.statut]}>
+            {i.statut}
+          </Badge>
         </DialogTitle>
-        <DialogDescription>{i.type} — {formatDateTime(i.dateHeure)}</DialogDescription>
+        <DialogDescription>
+          {i.type} — {formatDateTime(i.dateHeure)}
+        </DialogDescription>
       </DialogHeader>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label>Statut</Label>
-          <Select value={i.statut} onValueChange={(v: InterventionStatut) => update(id, { statut: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={i.statut}
+            onValueChange={(v: InterventionStatut) => update(id, { statut: v })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {STATUTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {STATUTS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <Label>Technicien</Label>
           <Select value={i.technicien} onValueChange={(v) => update(id, { technicien: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {techniciens.map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {techniciens.map((t: string) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -276,7 +319,9 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
       )}
 
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Fermer</Button>
+        <Button variant="outline" onClick={onClose}>
+          Fermer
+        </Button>
         <Button
           variant="secondary"
           onClick={() => {
@@ -303,9 +348,9 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
 }
 
 function NewInterventionDialog({ onClose }: { onClose: () => void }) {
-  const add = useStore((s) => s.addIntervention);
-  const contrats = useStore((s) => s.contrats);
-  const equipe = useStore((s) => s.equipe);
+  const { addIntervention: add } = useInterventionActions();
+  const { contrats } = useContrats();
+  const { equipe } = useEquipe();
   const techniciens = useMemo(
     () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
     [equipe],
@@ -337,11 +382,15 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
               }
             }}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">— Client hors contrat —</SelectItem>
               {contrats.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.clientNom} · {c.type}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>
+                  {c.clientNom} · {c.type}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -353,18 +402,30 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
         <div>
           <Label>Type</Label>
           <Select value={f.type} onValueChange={(v: InterventionType) => setF({ ...f, type: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {TYPES.map((t) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <Label>Technicien</Label>
           <Select value={f.technicien} onValueChange={(v) => setF({ ...f, technicien: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {techniciens.map((t: string) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              {techniciens.map((t: string) => (
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -386,7 +447,9 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
         </div>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Annuler</Button>
+        <Button variant="outline" onClick={onClose}>
+          Annuler
+        </Button>
         <Button
           onClick={() => {
             if (!f.clientNom) return toast.error("Nom du client requis");

@@ -1,19 +1,17 @@
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useSearchParams } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { Plus, AlertTriangle, Trash2 } from "lucide-react";
 import {
-  useStore,
   BESOINS,
-  formatFCFA,
-  formatDate,
-  daysUntil,
   type ContratStatut,
   type ContratType,
   type BesoinType,
   type Contrat,
   type LigneContrat,
   totalLignes,
-} from "@/lib/store";
+} from "@/types";
+import { useContrat, useContratActions, useContrats } from "@/features/contrats/api/use-contrats";
+import { daysUntil, formatDate, formatFCFA } from "@/lib/formatters";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,11 +44,6 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/contrats")({
-  validateSearch: (s: Record<string, unknown>) => ({ open: (s.open as string) || undefined }),
-  component: ContratsPage,
-});
-
 const TYPES: ContratType[] = [
   "Installation ponctuelle",
   "Contrat de maintenance annuel",
@@ -66,15 +59,16 @@ const STATUT_STYLE: Record<ContratStatut, string> = {
   Résilié: "bg-muted text-muted-foreground line-through",
 };
 
-function ContratsPage() {
-  const contrats = useStore((s) => s.contrats);
+export function ContratsPage() {
+  const { contrats } = useContrats();
   const [openNew, setOpenNew] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const search = useSearch({ from: "/contrats" });
+  const [searchParams] = useSearchParams();
+  const openContratId = searchParams.get("open");
 
   useEffect(() => {
-    if (search.open) setDetailId(search.open);
-  }, [search.open]);
+    if (openContratId) setDetailId(openContratId);
+  }, [openContratId]);
 
   const sorted = useMemo(
     () => [...contrats].sort((a, b) => +new Date(b.dateSignature) - +new Date(a.dateSignature)),
@@ -118,19 +112,25 @@ function ContratsPage() {
           <TableBody>
             {sorted.map((c) => {
               const j = daysUntil(c.echeance);
-              const alerte = j >= 0 && j <= 30 && c.statut !== "Résilié" && c.statut !== "Brouillon";
+              const alerte =
+                j >= 0 && j <= 30 && c.statut !== "Résilié" && c.statut !== "Brouillon";
               return (
                 <TableRow key={c.id} onClick={() => setDetailId(c.id)} className="cursor-pointer">
                   <TableCell className="font-medium">{c.clientNom}</TableCell>
                   <TableCell className="text-xs">{c.type}</TableCell>
                   <TableCell className="text-xs">{c.besoin}</TableCell>
-                  <TableCell className="text-right font-mono text-xs">{formatFCFA(c.montant)}</TableCell>
+                  <TableCell className="text-right font-mono text-xs">
+                    {formatFCFA(c.montant)}
+                  </TableCell>
                   <TableCell className="text-xs">{formatDate(c.dateSignature)}</TableCell>
                   <TableCell className="text-xs">
                     <div className="flex items-center gap-1.5">
                       {formatDate(c.echeance)}
                       {alerte && (
-                        <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30 text-[10px]">
+                        <Badge
+                          variant="outline"
+                          className="bg-warning/15 text-warning border-warning/30 text-[10px]"
+                        >
                           <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
                           {j}j
                         </Badge>
@@ -138,7 +138,9 @@ function ContratsPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={STATUT_STYLE[c.statut]}>{c.statut}</Badge>
+                    <Badge variant="outline" className={STATUT_STYLE[c.statut]}>
+                      {c.statut}
+                    </Badge>
                   </TableCell>
                 </TableRow>
               );
@@ -155,11 +157,8 @@ function ContratsPage() {
 }
 
 function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
-  const contrat = useStore((s) => s.contrats.find((c) => c.id === id));
-  const updateContrat = useStore((s) => s.updateContrat);
-  const addLigne = useStore((s) => s.addLigne);
-  const updateLigne = useStore((s) => s.updateLigne);
-  const removeLigne = useStore((s) => s.removeLigne);
+  const { contrat } = useContrat(id);
+  const { updateContrat, addLigne, updateLigne, removeLigne } = useContratActions();
   const [newLigne, setNewLigne] = useState({ description: "", quantite: 1, prixUnitaire: 0 });
 
   if (!contrat) return null;
@@ -170,9 +169,13 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           {contrat.clientNom}
-          <Badge variant="outline" className={STATUT_STYLE[contrat.statut]}>{contrat.statut}</Badge>
+          <Badge variant="outline" className={STATUT_STYLE[contrat.statut]}>
+            {contrat.statut}
+          </Badge>
         </DialogTitle>
-        <DialogDescription>{contrat.type} — {contrat.besoin}</DialogDescription>
+        <DialogDescription>
+          {contrat.type} — {contrat.besoin}
+        </DialogDescription>
       </DialogHeader>
 
       <div className="grid grid-cols-2 gap-4">
@@ -184,22 +187,36 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
         <div>
           <Label>Statut</Label>
-          <Select value={contrat.statut} onValueChange={(v: ContratStatut) => updateContrat(id, { statut: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={contrat.statut}
+            onValueChange={(v: ContratStatut) => updateContrat(id, { statut: v })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {STATUTS.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <Label>Type</Label>
-          <Select value={contrat.type} onValueChange={(v: ContratType) => updateContrat(id, { type: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={contrat.type}
+            onValueChange={(v: ContratType) => updateContrat(id, { type: v })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {TYPES.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -217,7 +234,9 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Input
             type="date"
             value={contrat.dateSignature.slice(0, 10)}
-            onChange={(e) => updateContrat(id, { dateSignature: new Date(e.target.value).toISOString() })}
+            onChange={(e) =>
+              updateContrat(id, { dateSignature: new Date(e.target.value).toISOString() })
+            }
           />
         </div>
         <div>
@@ -225,7 +244,9 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Input
             type="date"
             value={contrat.echeance.slice(0, 10)}
-            onChange={(e) => updateContrat(id, { echeance: new Date(e.target.value).toISOString() })}
+            onChange={(e) =>
+              updateContrat(id, { echeance: new Date(e.target.value).toISOString() })
+            }
           />
         </div>
       </div>
@@ -271,7 +292,9 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
                 value={l.prixUnitaire}
                 onChange={(e) => updateLigne(id, l.id, { prixUnitaire: Number(e.target.value) })}
               />
-              <div className="text-right font-mono text-sm">{formatFCFA(l.quantite * l.prixUnitaire)}</div>
+              <div className="text-right font-mono text-sm">
+                {formatFCFA(l.quantite * l.prixUnitaire)}
+              </div>
               <button
                 onClick={() => removeLigne(id, l.id)}
                 className="text-muted-foreground hover:text-destructive justify-self-center"
@@ -289,7 +312,9 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
             <div className="text-right text-sm">Total devis</div>
             <div />
             <div />
-            <div className="text-right font-mono text-sm text-primary">{formatFCFA(totalLignes(contrat.lignes))}</div>
+            <div className="text-right font-mono text-sm text-primary">
+              {formatFCFA(totalLignes(contrat.lignes))}
+            </div>
             <div />
           </div>
         </div>
@@ -328,9 +353,10 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
         </div>
       </div>
 
-
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Fermer</Button>
+        <Button variant="outline" onClick={onClose}>
+          Fermer
+        </Button>
         <Button
           onClick={() => {
             toast.success("Contrat enregistré");
@@ -345,7 +371,7 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
 }
 
 function NewContratDialog({ onClose }: { onClose: () => void }) {
-  const addContrat = useStore((s) => s.addContrat);
+  const { addContrat } = useContratActions();
   const [f, setF] = useState({
     clientNom: "",
     type: "Installation ponctuelle" as ContratType,
@@ -361,8 +387,7 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
   const updateL = (i: number, patch: Partial<Omit<LigneContrat, "id">>) =>
     setLignes((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const removeL = (i: number) => setLignes((ls) => ls.filter((_, idx) => idx !== i));
-  const addL = () =>
-    setLignes((ls) => [...ls, { description: "", quantite: 1, prixUnitaire: 0 }]);
+  const addL = () => setLignes((ls) => [...ls, { description: "", quantite: 1, prixUnitaire: 0 }]);
 
   return (
     <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -380,31 +405,53 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
         <div>
           <Label>Type</Label>
           <Select value={f.type} onValueChange={(v: ContratType) => setF({ ...f, type: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {TYPES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {TYPES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <Label>Service</Label>
           <Select value={f.besoin} onValueChange={(v: BesoinType) => setF({ ...f, besoin: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {BESOINS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              {BESOINS.map((b) => (
+                <SelectItem key={b} value={b}>
+                  {b}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div>
           <Label>Durée (mois)</Label>
-          <Input type="number" value={f.dureeMois} onChange={(e) => setF({ ...f, dureeMois: Number(e.target.value) })} />
+          <Input
+            type="number"
+            value={f.dureeMois}
+            onChange={(e) => setF({ ...f, dureeMois: Number(e.target.value) })}
+          />
         </div>
         <div>
           <Label>Statut initial</Label>
           <Select value={f.statut} onValueChange={(v: ContratStatut) => setF({ ...f, statut: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {STATUTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              {STATUTS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -426,7 +473,10 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
             <div />
           </div>
           {lignes.map((l, i) => (
-            <div key={i} className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-1.5 items-center border-t">
+            <div
+              key={i}
+              className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-1.5 items-center border-t"
+            >
               <Input
                 className="h-8"
                 placeholder="Ex : 4 caméras IP 4MP"
@@ -447,7 +497,9 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
                 value={l.prixUnitaire}
                 onChange={(e) => updateL(i, { prixUnitaire: Number(e.target.value) })}
               />
-              <div className="text-right font-mono text-sm">{formatFCFA((l.quantite || 0) * (l.prixUnitaire || 0))}</div>
+              <div className="text-right font-mono text-sm">
+                {formatFCFA((l.quantite || 0) * (l.prixUnitaire || 0))}
+              </div>
               <button
                 onClick={() => removeL(i)}
                 className="text-muted-foreground hover:text-destructive justify-self-center"
@@ -468,7 +520,9 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
       </div>
 
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Annuler</Button>
+        <Button variant="outline" onClick={onClose}>
+          Annuler
+        </Button>
         <Button
           onClick={() => {
             if (!f.clientNom) return toast.error("Nom du client requis");
@@ -495,4 +549,3 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
     </DialogContent>
   );
 }
-

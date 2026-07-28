@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
   LineChart,
@@ -17,24 +16,30 @@ import { Users, TrendingUp, Wallet, CalendarClock, AlertTriangle } from "lucide-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  useStore,
-  formatFCFA,
-  formatDate,
-  daysUntil,
-} from "@/lib/store";
+import { useProspects } from "@/features/prospects/api/use-prospects";
+import { useContrats } from "@/features/contrats/api/use-contrats";
+import { useInterventions } from "@/features/interventions/api/use-interventions";
+import { daysUntil, formatDate, formatFCFA } from "@/lib/formatters";
 
-export const Route = createFileRoute("/")({
-  component: Dashboard,
-});
+const MOIS_COURTS = [
+  "janv.",
+  "févr.",
+  "mars",
+  "avr.",
+  "mai",
+  "juin",
+  "juil.",
+  "août",
+  "sept.",
+  "oct.",
+  "nov.",
+  "déc.",
+];
 
-const MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
-
-
-function Dashboard() {
-  const prospects = useStore((s) => s.prospects);
-  const contrats = useStore((s) => s.contrats);
-  const interventions = useStore((s) => s.interventions);
+export function Dashboard() {
+  const { prospects } = useProspects();
+  const { contrats } = useContrats();
+  const { interventions } = useInterventions();
 
   const stats = useMemo(() => {
     const actifs = prospects.filter((p) => !["Converti", "Perdu"].includes(p.statut)).length;
@@ -59,7 +64,8 @@ function Dashboard() {
   }, [prospects, contrats, interventions]);
 
   const prospectsChart = useMemo(() => {
-    if (prospects.length === 0) return { data: [], tauxConversion: 0, totalContactes: 0, totalConvertis: 0 };
+    if (prospects.length === 0)
+      return { data: [], tauxConversion: 0, totalContactes: 0, totalConvertis: 0 };
     const sorted = [...prospects].sort(
       (a, b) => +new Date(a.dateCreation) - +new Date(b.dateCreation),
     );
@@ -85,10 +91,10 @@ function Dashboard() {
       });
     const totalContactes = prospects.length;
     const totalConvertis = prospects.filter((p) => p.statut === "Converti").length;
-    const tauxConversion = totalContactes > 0 ? Math.round((totalConvertis / totalContactes) * 100) : 0;
+    const tauxConversion =
+      totalContactes > 0 ? Math.round((totalConvertis / totalContactes) * 100) : 0;
     return { data, tauxConversion, totalContactes, totalConvertis };
   }, [prospects]);
-
 
   const caParService = useMemo(() => {
     const map = new Map<string, number>();
@@ -160,7 +166,9 @@ function Dashboard() {
               </p>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-2xl font-semibold text-primary">{prospectsChart.tauxConversion}%</div>
+              <div className="text-2xl font-semibold text-primary">
+                {prospectsChart.tauxConversion}%
+              </div>
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                 deviennent clients
               </div>
@@ -212,7 +220,6 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-
         <Card>
           <CardHeader>
             <CardTitle className="text-base">CA par type de service</CardTitle>
@@ -220,12 +227,26 @@ function Dashboard() {
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={caParService} dataKey="value" nameKey="name" innerRadius={45} outerRadius={85} paddingAngle={2}>
+                <Pie
+                  data={caParService}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={45}
+                  outerRadius={85}
+                  paddingAngle={2}
+                >
                   {caParService.map((_, i) => (
                     <Cell key={i} fill={`var(--chart-${(i % 7) + 1})`} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => formatFCFA(v)} contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8 }} />
+                <Tooltip
+                  formatter={(v: number) => formatFCFA(v)}
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                  }}
+                />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
@@ -239,12 +260,17 @@ function Dashboard() {
         </CardHeader>
         <CardContent className="space-y-3">
           {activites.map((a, i) => (
-            <div key={i} className="flex items-start gap-3 py-2 border-b border-border last:border-0">
+            <div
+              key={i}
+              className="flex items-start gap-3 py-2 border-b border-border last:border-0"
+            >
               <Badge variant="outline" className="mt-0.5">
                 {a.type}
               </Badge>
               <div className="flex-1 text-sm">{a.texte}</div>
-              <div className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(a.date)}</div>
+              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                {formatDate(a.date)}
+              </div>
             </div>
           ))}
         </CardContent>
@@ -279,7 +305,9 @@ function KpiCard({
             <Icon className="h-4 w-4" />
           </div>
         </div>
-        <div className={`font-semibold text-foreground ${small ? "text-lg" : "text-2xl"}`}>{value}</div>
+        <div className={`font-semibold text-foreground ${small ? "text-lg" : "text-2xl"}`}>
+          {value}
+        </div>
       </CardContent>
     </Card>
   );

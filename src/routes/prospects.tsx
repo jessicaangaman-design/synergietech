@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   Filter,
@@ -14,15 +14,16 @@ import {
   Search,
 } from "lucide-react";
 import {
-  useStore,
   PROSPECT_STATUTS,
   BESOINS,
-  formatDate,
   type ProspectStatut,
   type BesoinType,
   type Source,
   type Prospect,
-} from "@/lib/store";
+} from "@/types";
+import { useEquipe } from "@/features/equipe/api/use-equipe";
+import { useProspectActions, useProspects } from "@/features/prospects/api/use-prospects";
+import { formatDate } from "@/lib/formatters";
 import { validateName, validateEmail, stripDigits } from "@/lib/validation";
 import {
   PhoneField,
@@ -63,16 +64,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { useNavigate } from "@tanstack/react-router";
-
-export const Route = createFileRoute("/prospects")({
-  component: ProspectsPage,
-});
-
-const STATUT_STYLE: Record<
-  ProspectStatut,
-  { badge: string; dot: string; bar: string }
-> = {
+const STATUT_STYLE: Record<ProspectStatut, { badge: string; dot: string; bar: string }> = {
   Nouveau: {
     badge: "bg-chart-1/15 text-chart-1 border-chart-1/30",
     dot: "bg-chart-1",
@@ -114,9 +106,9 @@ function initials(nom: string) {
     .join("");
 }
 
-function ProspectsPage() {
-  const prospects = useStore((s) => s.prospects);
-  const equipe = useStore((s) => s.equipe);
+export function ProspectsPage() {
+  const { prospects } = useProspects();
+  const { equipe } = useEquipe();
   const commerciaux = useMemo(
     () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
     [equipe],
@@ -391,7 +383,7 @@ function ProspectsPage() {
 }
 
 function StatutMenu({ prospectId }: { prospectId: string }) {
-  const setStatut = useStore((s) => s.setProspectStatut);
+  const { setProspectStatut: setStatut } = useProspectActions();
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -406,7 +398,7 @@ function StatutMenu({ prospectId }: { prospectId: string }) {
           <DropdownMenuItem
             key={s}
             onClick={() => {
-              setStatut(prospectId, s);
+              void setStatut(prospectId, s);
               toast.success(`Statut : ${s}`);
             }}
           >
@@ -419,8 +411,8 @@ function StatutMenu({ prospectId }: { prospectId: string }) {
 }
 
 function NewProspectDialog({ onClose }: { onClose: () => void }) {
-  const addProspect = useStore((s) => s.addProspect);
-  const equipe = useStore((s) => s.equipe);
+  const { addProspect } = useProspectActions();
+  const { equipe } = useEquipe();
   const commerciaux = useMemo(
     () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
     [equipe],
@@ -436,7 +428,12 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
     source: "site web" as Source,
     commercial: commerciaux[0] ?? "",
   });
-  const [errors, setErrors] = useState<{ nom?: string; indicatif?: string; numero?: string; email?: string }>({});
+  const [errors, setErrors] = useState<{
+    nom?: string;
+    indicatif?: string;
+    numero?: string;
+    email?: string;
+  }>({});
   return (
     <DialogContent className="max-w-lg">
       <DialogHeader>
@@ -503,10 +500,14 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
         <div>
           <Label>Type de besoin</Label>
           <Select value={f.besoin} onValueChange={(v: BesoinType) => setF({ ...f, besoin: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {BESOINS.map((b) => (
-                <SelectItem key={b} value={b}>{b}</SelectItem>
+                <SelectItem key={b} value={b}>
+                  {b}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -514,28 +515,40 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
         <div>
           <Label>Source</Label>
           <Select value={f.source} onValueChange={(v: Source) => setF({ ...f, source: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {(["recommandation", "site web", "appel direct", "réseaux sociaux"] as Source[]).map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
+              {(["recommandation", "site web", "appel direct", "réseaux sociaux"] as Source[]).map(
+                (s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ),
+              )}
             </SelectContent>
           </Select>
         </div>
         <div className="col-span-2">
           <Label>Commercial assigné</Label>
           <Select value={f.commercial} onValueChange={(v) => setF({ ...f, commercial: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {commerciaux.map((c: string) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Annuler</Button>
+        <Button variant="outline" onClick={onClose}>
+          Annuler
+        </Button>
         <Button
           onClick={() => {
             const nomErr = validateName(f.nom, "Nom");
@@ -550,8 +563,9 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
             });
             if (nomErr || indErr || numErr || emailErr) return;
             const { indicatif, numero, ...rest } = f;
-            void indicatif; void numero;
-            addProspect({
+            void indicatif;
+            void numero;
+            void addProspect({
               ...rest,
               nom: f.nom.trim(),
               telephone: composePhone(f.indicatif, f.numero),
@@ -571,12 +585,15 @@ function NewProspectDialog({ onClose }: { onClose: () => void }) {
 }
 
 function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClose: () => void }) {
-  const addNote = useStore((s) => s.addNote);
-  const convertir = useStore((s) => s.convertirProspect);
-  const setStatut = useStore((s) => s.setProspectStatut);
+  const {
+    addNote,
+    convertirProspect: convertir,
+    setProspectStatut: setStatut,
+  } = useProspectActions();
   const [note, setNote] = useState("");
   const navigate = useNavigate();
-  const p = useStore((s) => s.prospects.find((x) => x.id === prospect.id)) || prospect;
+  const { prospects } = useProspects();
+  const p = prospects.find((item) => item.id === prospect.id) || prospect;
   const st = STATUT_STYLE[p.statut];
 
   return (
@@ -584,7 +601,9 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           {p.nom}
-          <Badge variant="outline" className={st.badge}>{p.statut}</Badge>
+          <Badge variant="outline" className={st.badge}>
+            {p.statut}
+          </Badge>
         </DialogTitle>
         {p.entreprise && <DialogDescription>{p.entreprise}</DialogDescription>}
       </DialogHeader>
@@ -597,25 +616,31 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
         <Info label="Source" value={p.source} />
         <Info icon={<UserIcon className="h-3.5 w-3.5" />} label="Commercial" value={p.commercial} />
         <Info label="Créé le" value={formatDate(p.dateCreation)} />
-        {p.derniereRelance && <Info label="Dernière relance" value={formatDate(p.derniereRelance)} />}
+        {p.derniereRelance && (
+          <Info label="Dernière relance" value={formatDate(p.derniereRelance)} />
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <Select value={p.statut} onValueChange={(v: ProspectStatut) => setStatut(p.id, v)}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+        <Select value={p.statut} onValueChange={(v: ProspectStatut) => void setStatut(p.id, v)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             {PROSPECT_STATUTS.map((s) => (
-              <SelectItem key={s} value={s}>{s}</SelectItem>
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
         {p.statut !== "Converti" && (
           <Button
-            onClick={() => {
-              const cid = convertir(p.id);
+            onClick={async () => {
+              const cid = await convertir(p.id);
               toast.success("Prospect converti en client — contrat créé en brouillon");
               onClose();
-              navigate({ to: "/contrats", search: { open: cid } as any });
+              navigate(`/contrats?open=${encodeURIComponent(cid)}`);
             }}
           >
             <ArrowRight className="h-4 w-4 mr-1.5" />
@@ -636,7 +661,7 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
           <Button
             onClick={() => {
               if (!note.trim()) return;
-              addNote(p.id, note);
+              void addNote(p.id, note);
               setNote("");
               toast.success("Note ajoutée");
             }}
@@ -662,15 +687,7 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
   );
 }
 
-function Info({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-}) {
+function Info({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div>
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
