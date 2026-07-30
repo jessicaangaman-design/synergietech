@@ -1,106 +1,72 @@
-import {
-    BrowserRouter,
-    Route,
-    Routes,
-    useLocation,
-    useNavigate,
-  } from "react-router-dom";
+import type { ReactNode } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-// import {DualRingSpinnerLoaderi} from '@/components/ui/dualRingsloader'
-import { useEffect, useState } from "react";
-import { ConnexionPage } from "@/routes/connexion";
-import AdminRoutes from "./AdminRoute";
 import useAuth from "@/hooks/authUser";
+import { ConnexionPage } from "@/routes/connexion";
 import NotAuthorized from "@/screens/notAuthorized";
+import AdminRoutes from "./AdminRoute";
+import CommercialRoutes from "./commercialRoute";
 import SecretaireRoutes from "./secretaireRoute";
 import TechnicienRoutes from "./technicienRoute";
-const GlobalRoutes = () => {
-  // const { isLogin, isAdmin } = useAuth();
-  // console.log("isLogin: ", isLogin);
-  //   const [loading, setLoading] = useState(true);
-  //   useEffect(() => {
-  //       const timer = setTimeout(() => {
-  //           setLoading(false);
-  //       }, 5000);
 
-  //       return () => clearTimeout(timer);
-  //   }, []);
-    // if(!isLogin){
-    //     return (
-    //         < CircularBarsSpinnerLoader />
-    //     )
-    // }
-   
+type Access = "admin" | "secretaire" | "commercial" | "technicien";
 
-    const  renderRoute = () => {
-          const ProtectedAdminRoute = ({ element }: { element: React.ReactNode }) => {
-            const { isLogin, isAdmin, isSuperAdmin } = useAuth();
-            console.log("isLogin : ", isLogin)
-            const location = useLocation();
-            if (!isLogin) {
-              localStorage.setItem(
-                "redirectPath",
-                location.pathname + location.search,
-              );
-              return <ConnexionPage />;
-            }
-            if (!isAdmin && !isSuperAdmin) {
-              return <NotAuthorized />;
-            }
-            return element;
-          };
-          const ProtectedSecretaireRoute = ({ element }: { element: React.ReactNode }) => {
-            const { isLogin, isSecretaire, isSuperAdmin } = useAuth();
-            // console.log("isLogin : ", isLogin)
-            const location = useLocation();
-            if (!isLogin) {
-              localStorage.setItem(
-                "redirectPath",
-                location.pathname + location.search,
-              );
-              return <ConnexionPage />;
-            }
-            if (!isSecretaire ) {
-              return <NotAuthorized />;
-            }
-            return element;
-          };
-          const ProtectedTechnicienRoute = ({ element }: { element: React.ReactNode }) => {
-            const { isLogin, isTechnicien, isSuperAdmin } = useAuth();
-            // console.log("isLogin : ", isLogin)
-            const location = useLocation();
-            if (!isLogin) {
-              localStorage.setItem(
-                "redirectPath",
-                location.pathname + location.search,
-              );
-              return <ConnexionPage />;
-            }
-            if (!isTechnicien ) {
-              return <NotAuthorized />;
-            }
-            return element;
-          };
-        return (
-            <Routes>
-                <Route path={"/"} element={<ConnexionPage />} />
-                {/* <Route path="/home" element=
-                {
-                  <Home>
-                     < User />
-                  </Home>
-                } /> */}
-                <Route path={"/admin/*"} element={<ProtectedAdminRoute element={<AdminRoutes />} />}  />
-                <Route path={"/secretaire/*"} element={<ProtectedSecretaireRoute element={<SecretaireRoutes />} />} />
-                <Route path={"/technicien/*"} element={<ProtectedTechnicienRoute element={<TechnicienRoutes />} />} />
-            </Routes>
-        )
-    }
+function ProtectedRoute({ access, children }: { access: Access; children: ReactNode }) {
+  const location = useLocation();
+  const { isLogin, isSuperAdmin, isAdmin, isSecretaire, isCommercial, isTechnicien } = useAuth();
 
-    return renderRoute();
+  if (!isLogin) {
+    localStorage.setItem("redirectPath", location.pathname + location.search);
+    return <Navigate to="/" replace />;
   }
 
+  const isAllowed =
+    isSuperAdmin ||
+    (access === "admin" && isAdmin) ||
+    (access === "secretaire" && isSecretaire) ||
+    (access === "commercial" && isCommercial) ||
+    (access === "technicien" && isTechnicien);
 
+  return isAllowed ? children : <NotAuthorized />;
+}
 
-export default GlobalRoutes
-
+export default function GlobalRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<ConnexionPage />} />
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute access="admin">
+            <AdminRoutes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/secretaire/*"
+        element={
+          <ProtectedRoute access="secretaire">
+            <SecretaireRoutes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/commercial/*"
+        element={
+          <ProtectedRoute access="commercial">
+            <CommercialRoutes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/technicien/*"
+        element={
+          <ProtectedRoute access="technicien">
+            <TechnicienRoutes />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}

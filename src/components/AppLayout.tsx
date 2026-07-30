@@ -15,7 +15,17 @@ import { useSWRConfig } from "swr";
 
 import logoSts from "@/assets/logo-sts.jpg.asset.json";
 import { Button } from "@/components/ui/button";
+import { getAppSection, NAVIGATION_BY_SECTION, type NavigationIcon } from "@/config/navigation";
 import useAuth from "@/hooks/authUser";
+
+const NAVIGATION_ICONS: Record<NavigationIcon, typeof LayoutDashboard> = {
+  dashboard: LayoutDashboard,
+  prospects: Users,
+  contracts: FileText,
+  clients: Building2,
+  interventions: Wrench,
+  team: UserCog,
+};
 
 export function AppLayout() {
   const { pathname } = useLocation();
@@ -24,57 +34,13 @@ export function AppLayout() {
   const logout = useAuth((state) => state.logout);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const basePath = pathname.startsWith("/secretaire")
-    ? "/secretaire"
-    : pathname.startsWith("/technicien")
-      ? "/technicien"
-      : "/admin";
-
-  const navItems =
-    basePath === "/technicien"
-      ? [
-          {
-            to: `${basePath}/interventions`,
-            label: "Interventions",
-            icon: Wrench,
-          },
-        ]
-      : [
-          {
-            to: `${basePath}/home`,
-            label: "Tableau de bord",
-            icon: LayoutDashboard,
-          },
-          {
-            to: `${basePath}/prospects`,
-            label: "Prospects",
-            icon: Users,
-          },
-          {
-            to: `${basePath}/contracts`,
-            label: "Contrats",
-            icon: FileText,
-          },
-          ...(basePath === "/admin"
-            ? [
-                {
-                  to: `${basePath}/clients`,
-                  label: "Clients",
-                  icon: Building2,
-                },
-              ]
-            : []),
-          {
-            to: `${basePath}/interventions`,
-            label: "Interventions",
-            icon: Wrench,
-          },
-          {
-            to: `${basePath}/equipes`,
-            label: "Équipe",
-            icon: UserCog,
-          },
-        ];
+  const section = getAppSection(pathname);
+  const basePath = `/${section}`;
+  const navItems = NAVIGATION_BY_SECTION[section].map((item) => ({
+    ...item,
+    to: `${basePath}/${item.path}`,
+    icon: NAVIGATION_ICONS[item.icon],
+  }));
 
   const NavContent = (
     <>

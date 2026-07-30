@@ -1,6 +1,9 @@
 import { useSearchParams } from "react-router-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState, useEffect } from "react";
 import { Plus, AlertTriangle, Trash2 } from "lucide-react";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
 import {
   BESOINS,
   type ContratStatut,
@@ -11,6 +14,8 @@ import {
   totalLignes,
 } from "@/types";
 import { useContrat, useContratActions, useContrats } from "@/features/contrats/api/use-contrats";
+import { FieldError } from "@/components/PhoneField";
+import { getApiErrorMessage } from "@/lib/api/client";
 import { daysUntil, formatDate, formatFCFA } from "@/lib/formatters";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -50,6 +55,34 @@ const TYPES: ContratType[] = [
   "Abonnement télésurveillance",
 ];
 const STATUTS: ContratStatut[] = ["Brouillon", "Actif", "En renouvellement", "Expiré", "Résilié"];
+
+const contratFormSchema = z.object({
+  clientNom: z.string().trim().min(1, "Le nom du client est obligatoire").max(120),
+  type: z.custom<ContratType>(
+    (value) => TYPES.includes(value as ContratType),
+    "Type de contrat invalide",
+  ),
+  besoin: z.custom<BesoinType>(
+    (value) => BESOINS.includes(value as BesoinType),
+    "Service invalide",
+  ),
+  dureeMois: z.number().int().min(1, "La durée minimale est d'un mois").max(120),
+  statut: z.custom<ContratStatut>(
+    (value) => STATUTS.includes(value as ContratStatut),
+    "Statut invalide",
+  ),
+  lignes: z
+    .array(
+      z.object({
+        description: z.string().trim().min(1, "La désignation est obligatoire"),
+        quantite: z.number().int().min(1, "La quantité doit être supérieure à zéro"),
+        prixUnitaire: z.number().min(0, "Le prix ne peut pas être négatif"),
+      }),
+    )
+    .min(1, "Ajoutez au moins une ligne au devis"),
+});
+
+type ContratFormValues = z.infer<typeof contratFormSchema>;
 
 const STATUT_STYLE: Record<ContratStatut, string> = {
   Brouillon: "bg-muted text-muted-foreground",
@@ -372,22 +405,64 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
 function NewContratDialog({ onClose }: { onClose: () => void }) {
   const { addContrat } = useContratActions();
-  const [f, setF] = useState({
-    clientNom: "",
-    type: "Installation ponctuelle" as ContratType,
-    besoin: "vidéosurveillance" as BesoinType,
-    dureeMois: 12,
-    statut: "Brouillon" as ContratStatut,
+  const {
+    clearErrors,
+    control,
+    handleSubmit,
+    setError,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<ContratFormValues>({
+    resolver: zodResolver(contratFormSchema),
+    defaultValues: {
+      clientNom: "",
+      type: "Installation ponctuelle",
+      besoin: "vidéosurveillance",
+      dureeMois: 12,
+      statut: "Brouillon",
+      lignes: [{ description: "", quantite: 1, prixUnitaire: 0 }],
+    },
   });
-  const [lignes, setLignes] = useState<Omit<LigneContrat, "id">[]>([
-    { description: "", quantite: 1, prixUnitaire: 0 },
-  ]);
-  const total = lignes.reduce((s, l) => s + (l.quantite || 0) * (l.prixUnitaire || 0), 0);
+  const {
+    fields: lignes,
+    append: addLigne,
+    remove: removeLigne,
+  } = useFieldArray({ control, name: "lignes" });
+  const lignesValues = watch("lignes");
+  const total = lignesValues.reduce(
+    (somme, ligne) => somme + (ligne.quantite || 0) * (ligne.prixUnitaire || 0),
+    0,
+  );
 
-  const updateL = (i: number, patch: Partial<Omit<LigneContrat, "id">>) =>
-    setLignes((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  const removeL = (i: number) => setLignes((ls) => ls.filter((_, idx) => idx !== i));
-  const addL = () => setLignes((ls) => [...ls, { description: "", quantite: 1, prixUnitaire: 0 }]);
+  const submit = async (values: ContratFormValues) => {
+    clearErrors("root.server");
+
+    const lignesValides = values.lignes
+      .filter((ligne) => ligne.description && ligne.quantite > 0)
+      .map((ligne) => ({ ...ligne, id: crypto.randomUUID() }));
+    const now = new Date();
+    const echeance = new Date(now);
+    echeance.setMonth(echeance.getMonth() + values.dureeMois);
+
+    try {
+      await addContrat({
+        ...values,
+        lignes: lignesValides,
+        montant: lignesValides.reduce(
+          (somme, ligne) => somme + ligne.quantite * ligne.prixUnitaire,
+          0,
+        ),
+        dateSignature: now.toISOString(),
+        echeance: echeance.toISOString(),
+      });
+      toast.success("Contrat créé — CA dashboard mis à jour");
+      onClose();
+    } catch (error) {
+      const message = getApiErrorMessage(error, "La création du contrat a échoué.");
+      setError("root.server", { type: "server", message });
+      toast.error(message);
+    }
+  };
 
   return (
     <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -397,155 +472,209 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
           Le montant du contrat est calculé automatiquement à partir des lignes du devis.
         </DialogDescription>
       </DialogHeader>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
-          <Label>Client *</Label>
-          <Input value={f.clientNom} onChange={(e) => setF({ ...f, clientNom: e.target.value })} />
-        </div>
-        <div>
-          <Label>Type</Label>
-          <Select value={f.type} onValueChange={(v: ContratType) => setF({ ...f, type: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TYPES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Service</Label>
-          <Select value={f.besoin} onValueChange={(v: BesoinType) => setF({ ...f, besoin: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {BESOINS.map((b) => (
-                <SelectItem key={b} value={b}>
-                  {b}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Durée (mois)</Label>
-          <Input
-            type="number"
-            value={f.dureeMois}
-            onChange={(e) => setF({ ...f, dureeMois: Number(e.target.value) })}
-          />
-        </div>
-        <div>
-          <Label>Statut initial</Label>
-          <Select value={f.statut} onValueChange={(v: ContratStatut) => setF({ ...f, statut: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUTS.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {s}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="mt-2">
-        <div className="flex items-center justify-between mb-2">
-          <Label>Lignes du devis</Label>
-          <Button size="sm" variant="outline" onClick={addL}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter une ligne
-          </Button>
-        </div>
-        <div className="rounded-md border overflow-hidden">
-          <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
-            <div>Désignation</div>
-            <div className="text-center">Qté</div>
-            <div className="text-right">P.U. (FCFA)</div>
-            <div className="text-right">Total</div>
-            <div />
+      <form onSubmit={handleSubmit(submit)}>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <Label>Client *</Label>
+            <Controller
+              name="clientNom"
+              control={control}
+              render={({ field }) => <Input {...field} aria-invalid={!!errors.clientNom} />}
+            />
+            <FieldError message={errors.clientNom?.message} />
           </div>
-          {lignes.map((l, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-1.5 items-center border-t"
+          <div>
+            <Label>Type</Label>
+            <Controller
+              name="type"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger aria-invalid={!!errors.type}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError message={errors.type?.message} />
+          </div>
+          <div>
+            <Label>Service</Label>
+            <Controller
+              name="besoin"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger aria-invalid={!!errors.besoin}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BESOINS.map((besoin) => (
+                      <SelectItem key={besoin} value={besoin}>
+                        {besoin}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError message={errors.besoin?.message} />
+          </div>
+          <div>
+            <Label>Durée (mois)</Label>
+            <Controller
+              name="dureeMois"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={field.value}
+                  onChange={(event) => field.onChange(Number(event.target.value))}
+                  aria-invalid={!!errors.dureeMois}
+                />
+              )}
+            />
+            <FieldError message={errors.dureeMois?.message} />
+          </div>
+          <div>
+            <Label>Statut initial</Label>
+            <Controller
+              name="statut"
+              control={control}
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger aria-invalid={!!errors.statut}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUTS.map((statut) => (
+                      <SelectItem key={statut} value={statut}>
+                        {statut}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError message={errors.statut?.message} />
+          </div>
+        </div>
+
+        <div className="mt-2">
+          <div className="flex items-center justify-between mb-2">
+            <Label>Lignes du devis</Label>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => addLigne({ description: "", quantite: 1, prixUnitaire: 0 })}
             >
-              <Input
-                className="h-8"
-                placeholder="Ex : 4 caméras IP 4MP"
-                value={l.description}
-                onChange={(e) => updateL(i, { description: e.target.value })}
-              />
-              <Input
-                type="number"
-                min={1}
-                className="h-8 text-center"
-                value={l.quantite}
-                onChange={(e) => updateL(i, { quantite: Number(e.target.value) })}
-              />
-              <Input
-                type="number"
-                min={0}
-                className="h-8 text-right font-mono"
-                value={l.prixUnitaire}
-                onChange={(e) => updateL(i, { prixUnitaire: Number(e.target.value) })}
-              />
-              <div className="text-right font-mono text-sm">
-                {formatFCFA((l.quantite || 0) * (l.prixUnitaire || 0))}
-              </div>
-              <button
-                onClick={() => removeL(i)}
-                className="text-muted-foreground hover:text-destructive justify-self-center"
-                aria-label="Supprimer la ligne"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+              <Plus className="h-3.5 w-3.5 mr-1" /> Ajouter une ligne
+            </Button>
+          </div>
+          <div className="rounded-md border overflow-hidden">
+            <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 bg-muted/50 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">
+              <div>Désignation</div>
+              <div className="text-center">Qté</div>
+              <div className="text-right">P.U. (FCFA)</div>
+              <div className="text-right">Total</div>
+              <div />
             </div>
-          ))}
-          <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 border-t bg-muted/30 items-center font-medium">
-            <div className="text-right text-sm">Total devis</div>
-            <div />
-            <div />
-            <div className="text-right font-mono text-sm text-primary">{formatFCFA(total)}</div>
-            <div />
+            {lignes.map((ligne, index) => (
+              <div
+                key={ligne.id}
+                className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-1.5 items-start border-t"
+              >
+                <div>
+                  <Controller
+                    name={`lignes.${index}.description`}
+                    control={control}
+                    render={({ field }) => (
+                      <Input {...field} className="h-8" placeholder="Ex : 4 caméras IP 4MP" />
+                    )}
+                  />
+                  <FieldError message={errors.lignes?.[index]?.description?.message} />
+                </div>
+                <div>
+                  <Controller
+                    name={`lignes.${index}.quantite`}
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-8 text-center"
+                        value={field.value}
+                        onChange={(event) => field.onChange(Number(event.target.value))}
+                      />
+                    )}
+                  />
+                  <FieldError message={errors.lignes?.[index]?.quantite?.message} />
+                </div>
+                <div>
+                  <Controller
+                    name={`lignes.${index}.prixUnitaire`}
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        min={0}
+                        className="h-8 text-right font-mono"
+                        value={field.value}
+                        onChange={(event) => field.onChange(Number(event.target.value))}
+                      />
+                    )}
+                  />
+                  <FieldError message={errors.lignes?.[index]?.prixUnitaire?.message} />
+                </div>
+                <div className="text-right font-mono text-sm pt-2">
+                  {formatFCFA(
+                    (lignesValues[index]?.quantite || 0) * (lignesValues[index]?.prixUnitaire || 0),
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeLigne(index)}
+                  className="text-muted-foreground hover:text-destructive justify-self-center mt-2"
+                  aria-label="Supprimer la ligne"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            {lignes.length === 0 && (
+              <div className="border-t px-3 py-2">
+                <FieldError message={errors.lignes?.message} />
+              </div>
+            )}
+            <div className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-2 border-t bg-muted/30 items-center font-medium">
+              <div className="text-right text-sm">Total devis</div>
+              <div />
+              <div />
+              <div className="text-right font-mono text-sm text-primary">{formatFCFA(total)}</div>
+              <div />
+            </div>
           </div>
         </div>
-      </div>
-
-      <DialogFooter>
-        <Button variant="outline" onClick={onClose}>
-          Annuler
-        </Button>
-        <Button
-          onClick={() => {
-            if (!f.clientNom) return toast.error("Nom du client requis");
-            const filtered = lignes
-              .filter((l) => l.description.trim() && l.quantite > 0)
-              .map((l) => ({ ...l, id: Math.random().toString(36).slice(2, 10) }));
-            const now = new Date();
-            const echeance = new Date(now);
-            echeance.setMonth(echeance.getMonth() + (f.dureeMois || 6));
-            addContrat({
-              ...f,
-              montant: filtered.reduce((s, l) => s + l.quantite * l.prixUnitaire, 0),
-              dateSignature: now.toISOString(),
-              echeance: echeance.toISOString(),
-              lignes: filtered,
-            } as Omit<Contrat, "id">);
-            toast.success("Contrat créé — CA dashboard mis à jour");
-            onClose();
-          }}
-        >
-          Créer le devis
-        </Button>
-      </DialogFooter>
+        <FieldError message={errors.root?.server?.message} />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Création..." : "Créer le devis"}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }

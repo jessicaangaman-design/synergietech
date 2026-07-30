@@ -2,6 +2,7 @@ import useSWR, { useSWRConfig } from "swr";
 
 import { apiRequest } from "@/lib/api/client";
 import { apiEndpoints } from "@/lib/api/endpoints";
+import { extractList, type ListResponse } from "@/lib/api/list-response";
 import type { Contrat, LigneContrat } from "@/types";
 
 export type CreateContratPayload = Omit<Contrat, "id" | "lignes"> & {
@@ -9,9 +10,12 @@ export type CreateContratPayload = Omit<Contrat, "id" | "lignes"> & {
 };
 
 export function useContrats() {
-  const { data, error, mutate, isLoading } = useSWR<Contrat[]>(apiEndpoints.contrats, apiRequest);
+  const { data, error, mutate, isLoading } = useSWR<ListResponse<Contrat>>(
+    apiEndpoints.contrats,
+    apiRequest,
+  );
 
-  return { contrats: data ?? [], error, mutate, isLoading };
+  return { contrats: extractList(data), error, mutate, isLoading };
 }
 
 export function useContrat(id?: string) {

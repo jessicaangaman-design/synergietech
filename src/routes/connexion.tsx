@@ -60,6 +60,7 @@ export function ConnexionPage() {
           login(res.data.token);
           console.log('isLogin: ', isLogin);
           console.log('isAdmin: ', isAdmin);
+           console.log('isSecretaire: ', isSecretaire);
           if (isSuperAdmin || isAdmin) {
             localStorage.setItem("redirectPath", '/admin');
             navigate("/admin/home", { replace: true });
@@ -75,7 +76,7 @@ export function ConnexionPage() {
             navigate("/technicien", { replace: true });
           } else if (isSecretaire) {
             localStorage.setItem("redirectPath", '/secretaire');
-            navigate("/secretaire", { replace: true });
+            navigate("/secretaire/home", { replace: true });
           } 
           // navigate(redirectPath, { replace: true });
         } else {

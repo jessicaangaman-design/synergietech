@@ -1,8 +1,10 @@
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 
-import type { Client } from "@/features/interface/client.type";
+import type { Client, CreateClientDto, UpdateClientDto } from "@/features/interface/client.type";
 import { api } from "@/features/util/url";
 import { apiRequest } from "@/lib/api/client";
+import { apiEndpoints } from "@/lib/api/endpoints";
+import { CreateMembrePayload } from "@/features/equipe/api/use-equipe";
 
 type ClientListResponse =
   | Client[]
@@ -21,10 +23,9 @@ function extractClients(response?: ClientListResponse): Client[] {
 
 export function useClients() {
   const { data, error, mutate, isLoading } = useSWR<ClientListResponse>(
-    `${api}client/getAll`,
+    `${api}client/`,
     apiRequest,
   );
-
   return {
     clients: extractClients(data),
     error,
@@ -35,14 +36,49 @@ export function useClients() {
 
 export function useClient(id?: string) {
   const { data, error, mutate, isLoading } = useSWR<Client | null>(
-    id ? `${api}client/get/${id}` : null,
+    id ? `${api}client/${id}` : null,
     apiRequest,
   );
-
   return {
     client: data ?? null,
     error,
     mutate,
     isLoading,
+  };
+}
+
+
+export function useClientActions() {
+  const { mutate } = useSWRConfig();
+
+  const refresh = (id?: string) =>
+    Promise.all([
+      mutate(apiEndpoints.allUser),
+      id ? mutate(apiEndpoints.userId(id)) : Promise.resolve(),
+      mutate(apiEndpoints.prospects),
+      mutate(apiEndpoints.interventions),
+    ]);
+
+  return {
+    addClient: async (payload: CreateClientDto) => {
+      const user = await apiRequest<Client>(apiEndpoints.createClient, {
+        method: "POST",
+        body: payload,
+      });
+      await refresh();
+      return user;
+    },
+    updateClient: async (id: string, patch: UpdateClientDto) => {
+      const user = await apiRequest<Client>(apiEndpoints.updateClient(id), {
+        method: "PUT",
+        body: patch,
+      });
+      await refresh(id);
+      return user;
+    },
+    removeClient: async (id: string) => {
+      await apiRequest<void>(apiEndpoints.deleteClient(id), { method: "DELETE" });
+      await refresh();
+    },
   };
 }

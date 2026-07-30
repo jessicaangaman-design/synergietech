@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import {
   Plus,
   Filter,
@@ -13,16 +16,11 @@ import {
   User as UserIcon,
   Search,
 } from "lucide-react";
-import {
-  PROSPECT_STATUTS,
-  BESOINS,
-  type ProspectStatut,
-  type BesoinType,
-  type Source,
-  type Prospect,
-} from "@/types";
-import { useEquipe } from "@/features/equipe/api/use-equipe";
+import { PROSPECT_STATUTS, BESOINS, type ProspectStatut, type Prospect } from "@/types";
+import { useUsers } from "@/features/equipe/api/use-equipe";
+import { RoleSTS, SourceProspect, TypeBesoin } from "@/features/interface/enum";
 import { useProspectActions, useProspects } from "@/features/prospects/api/use-prospects";
+import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate } from "@/lib/formatters";
 import { validateName, validateEmail, stripDigits } from "@/lib/validation";
 import {
@@ -64,6 +62,58 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+
+const TYPE_BESOIN_OPTIONS = [
+  { value: TypeBesoin.VIDEOSURVEILLANCE, label: "Vidéosurveillance" },
+  { value: TypeBesoin.CONTROLE_ACCES, label: "Contrôle d'accès" },
+  { value: TypeBesoin.CLOTURE_ELECTRIQUE, label: "Clôture électrique" },
+  { value: TypeBesoin.MOTORISATION_PORTAIL, label: "Motorisation de portail" },
+  { value: TypeBesoin.INCENDIE, label: "Incendie" },
+  { value: TypeBesoin.ALARME, label: "Alarme" },
+  { value: TypeBesoin.RADIO, label: "Radio" },
+] as const;
+
+const SOURCE_OPTIONS = [
+  { value: SourceProspect.RECOMMANDATION, label: "Recommandation" },
+  { value: SourceProspect.SITE_WEB, label: "Site web" },
+  { value: SourceProspect.APPEL_DIRECT, label: "Appel direct" },
+  { value: SourceProspect.RESEAUX_SOCIAUX, label: "Réseaux sociaux" },
+  { value: SourceProspect.AUTRE, label: "Autre" },
+] as const;
+
+const prospectFormSchema = z
+  .object({
+    nom: z.string().trim().max(80, "Le nom ne doit pas dépasser 80 caractères"),
+    entreprise: z.string().trim().max(120, "Le nom de l'entreprise est trop long"),
+    indicatif: z.string(),
+    telephone: z.string(),
+    email: z.string().trim().max(254, "L'adresse e-mail est trop longue"),
+    adresse: z.string().trim(),
+    typeBesoin: z.nativeEnum(TypeBesoin),
+    source: z.nativeEnum(SourceProspect),
+    notes: z.string().trim().max(2000, "Les notes ne doivent pas dépasser 2000 caractères"),
+    commercialId: z.string(),
+  })
+  .superRefine((values, context) => {
+    const nomError = validateName(values.nom, "Nom");
+    if (nomError) context.addIssue({ code: "custom", path: ["nom"], message: nomError });
+
+    const indicatifError = validateDialCode(values.indicatif);
+    if (indicatifError) {
+      context.addIssue({ code: "custom", path: ["indicatif"], message: indicatifError });
+    }
+
+    const numeroError = validateNationalNumber(values.telephone, true);
+    if (numeroError) {
+      context.addIssue({ code: "custom", path: ["telephone"], message: numeroError });
+    }
+
+    const emailError = validateEmail(values.email, false);
+    if (emailError) context.addIssue({ code: "custom", path: ["email"], message: emailError });
+  });
+
+type ProspectFormValues = z.infer<typeof prospectFormSchema>;
+
 const STATUT_STYLE: Record<ProspectStatut, { badge: string; dot: string; bar: string }> = {
   Nouveau: {
     badge: "bg-chart-1/15 text-chart-1 border-chart-1/30",
@@ -85,6 +135,11 @@ const STATUT_STYLE: Record<ProspectStatut, { badge: string; dot: string; bar: st
     dot: "bg-chart-7",
     bar: "bg-chart-7",
   },
+  Gagné: {
+    badge: "bg-success/15 text-success border-success/30",
+    dot: "bg-success",
+    bar: "bg-success",
+  },
   Converti: {
     badge: "bg-success/15 text-success border-success/30",
     dot: "bg-success",
@@ -97,6 +152,8 @@ const STATUT_STYLE: Record<ProspectStatut, { badge: string; dot: string; bar: st
   },
 };
 
+const getStatutStyle = (statut: ProspectStatut) => STATUT_STYLE[statut] ?? STATUT_STYLE.Nouveau;
+
 function initials(nom: string) {
   return nom
     .split(" ")
@@ -108,10 +165,14 @@ function initials(nom: string) {
 
 export function ProspectsPage() {
   const { prospects } = useProspects();
-  const { equipe } = useEquipe();
+  const { users } = useUsers();
   const commerciaux = useMemo(
-    () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
-    [equipe],
+    () =>
+      users
+        .filter((user) => user.role === RoleSTS.COMMERCIAL && user.isActive)
+        .map((user) => user.name)
+        .filter((name): name is string => name !== null),
+    [users],
   );
 
   const [tab, setTab] = useState<ProspectStatut | "Tous">("Tous");
@@ -166,7 +227,7 @@ export function ProspectsPage() {
       <div className="flex flex-wrap items-center gap-1.5 mb-4 border-b border-border pb-3">
         {(["Tous", ...PROSPECT_STATUTS] as const).map((s) => {
           const active = tab === s;
-          const style = s === "Tous" ? null : STATUT_STYLE[s as ProspectStatut];
+          const style = s === "Tous" ? null : getStatutStyle(s as ProspectStatut);
           return (
             <button
               key={s}
@@ -263,7 +324,7 @@ export function ProspectsPage() {
                 </tr>
               )}
               {filtered.map((p) => {
-                const st = STATUT_STYLE[p.statut];
+                const st = getStatutStyle(p.statut);
                 return (
                   <tr
                     key={p.id}
@@ -342,7 +403,7 @@ export function ProspectsPage() {
           </Card>
         )}
         {filtered.map((p) => {
-          const st = STATUT_STYLE[p.statut];
+          const st = getStatutStyle(p.statut);
           return (
             <Card
               key={p.id}
@@ -384,6 +445,16 @@ export function ProspectsPage() {
 
 function StatutMenu({ prospectId }: { prospectId: string }) {
   const { setProspectStatut: setStatut } = useProspectActions();
+
+  const changeStatut = async (statut: ProspectStatut) => {
+    try {
+      await setStatut(prospectId, statut);
+      toast.success(`Statut : ${statut}`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Le changement de statut a échoué."));
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -395,13 +466,7 @@ function StatutMenu({ prospectId }: { prospectId: string }) {
         <DropdownMenuLabel>Changer le statut</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {PROSPECT_STATUTS.map((s) => (
-          <DropdownMenuItem
-            key={s}
-            onClick={() => {
-              void setStatut(prospectId, s);
-              toast.success(`Statut : ${s}`);
-            }}
-          >
+          <DropdownMenuItem key={s} onClick={() => void changeStatut(s)}>
             {s}
           </DropdownMenuItem>
         ))}
@@ -412,174 +477,234 @@ function StatutMenu({ prospectId }: { prospectId: string }) {
 
 function NewProspectDialog({ onClose }: { onClose: () => void }) {
   const { addProspect } = useProspectActions();
-  const { equipe } = useEquipe();
+  const { users } = useUsers();
   const commerciaux = useMemo(
-    () => equipe.filter((m) => m.role === "commercial" && m.actif).map((m) => m.nom),
-    [equipe],
+    () => users.filter((user) => user.role === RoleSTS.COMMERCIAL && user.isActive),
+    [users],
   );
-  const [f, setF] = useState({
-    nom: "",
-    entreprise: "",
-    indicatif: "225",
-    numero: "",
-    email: "",
-    adresse: "",
-    besoin: "vidéosurveillance" as BesoinType,
-    source: "site web" as Source,
-    commercial: commerciaux[0] ?? "",
+  const {
+    clearErrors,
+    control,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<ProspectFormValues>({
+    resolver: zodResolver(prospectFormSchema),
+    defaultValues: {
+      nom: "",
+      entreprise: "",
+      indicatif: "225",
+      telephone: "",
+      email: "",
+      adresse: "",
+      typeBesoin: TypeBesoin.VIDEOSURVEILLANCE,
+      source: SourceProspect.SITE_WEB,
+      notes: "",
+      commercialId: commerciaux[0]?.id ?? "",
+    },
   });
-  const [errors, setErrors] = useState<{
-    nom?: string;
-    indicatif?: string;
-    numero?: string;
-    email?: string;
-  }>({});
+
+  const submit = async (values: ProspectFormValues) => {
+    clearErrors("root.server");
+
+    try {
+      await addProspect({
+        nom: values.nom,
+        entreprise: values.entreprise || undefined,
+        telephone: composePhone(values.indicatif, values.telephone),
+        email: values.email || undefined,
+        adresse: values.adresse,
+        typeBesoin: values.typeBesoin,
+        source: values.source,
+        notes: values.notes || undefined,
+        commercialId: values.commercialId || undefined,
+      });
+      toast.success("Prospect créé");
+      onClose();
+    } catch (error) {
+      const message = getApiErrorMessage(error, "La création du prospect a échoué.");
+      setError("root.server", { type: "server", message });
+      toast.error(message);
+    }
+  };
+
   return (
     <DialogContent className="max-w-lg">
       <DialogHeader>
         <DialogTitle>Nouveau prospect</DialogTitle>
         <DialogDescription>Créer une fiche prospect dans le pipeline</DialogDescription>
       </DialogHeader>
-      <div className="grid grid-cols-2 gap-3">
+      <form onSubmit={handleSubmit(submit)} className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <Label>Nom complet *</Label>
-          <Input
-            value={f.nom}
-            onChange={(e) => {
-              setF({ ...f, nom: stripDigits(e.target.value) });
-              setErrors((er) => ({ ...er, nom: undefined }));
-            }}
-            placeholder="Ex: Konan Aristide"
-            maxLength={80}
-            aria-invalid={!!errors.nom}
+          <Controller
+            name="nom"
+            control={control}
+            render={({ field }) => (
+              <Input
+                {...field}
+                onChange={(event) => field.onChange(stripDigits(event.target.value))}
+                placeholder="Ex: Konan Aristide"
+                maxLength={80}
+                aria-invalid={!!errors.nom}
+              />
+            )}
           />
-          <FieldError message={errors.nom} />
+          <FieldError message={errors.nom?.message} />
         </div>
         <div className="col-span-2">
           <Label>Entreprise</Label>
-          <Input
-            value={f.entreprise}
-            onChange={(e) => setF({ ...f, entreprise: e.target.value })}
-            maxLength={120}
+          <Controller
+            name="entreprise"
+            control={control}
+            render={({ field }) => <Input {...field} maxLength={120} />}
           />
+          <FieldError message={errors.entreprise?.message} />
         </div>
-        <PhoneField
-          required
-          indicatif={f.indicatif}
-          national={f.numero}
-          onIndicatifChange={(v) => {
-            setF({ ...f, indicatif: v });
-            setErrors((er) => ({ ...er, indicatif: undefined }));
-          }}
-          onNationalChange={(v) => {
-            setF({ ...f, numero: v });
-            setErrors((er) => ({ ...er, numero: undefined }));
-          }}
-          indicatifError={errors.indicatif}
-          nationalError={errors.numero}
+        <Controller
+          name="indicatif"
+          control={control}
+          render={({ field: indicatifField }) => (
+            <Controller
+              name="telephone"
+              control={control}
+              render={({ field: numeroField }) => (
+                <PhoneField
+                  required
+                  indicatif={indicatifField.value}
+                  national={numeroField.value}
+                  onIndicatifChange={indicatifField.onChange}
+                  onNationalChange={numeroField.onChange}
+                  indicatifError={errors.indicatif?.message}
+                  nationalError={errors.telephone?.message}
+                />
+              )}
+            />
+          )}
         />
         <div className="col-span-2">
           <Label>Email</Label>
-          <Input
-            type="email"
-            value={f.email}
-            onChange={(e) => {
-              setF({ ...f, email: e.target.value });
-              setErrors((er) => ({ ...er, email: undefined }));
-            }}
-            placeholder="nom@exemple.com"
-            maxLength={254}
-            aria-invalid={!!errors.email}
+          <Controller
+            name="email"
+            control={control}
+            render={({ field }) => (
+              <Input
+                {...field}
+                type="email"
+                placeholder="nom@exemple.com"
+                maxLength={254}
+                aria-invalid={!!errors.email}
+              />
+            )}
           />
-          <FieldError message={errors.email} />
+          <FieldError message={errors.email?.message} />
         </div>
         <div className="col-span-2">
           <Label>Adresse</Label>
-          <Input value={f.adresse} onChange={(e) => setF({ ...f, adresse: e.target.value })} />
+          <Controller
+            name="adresse"
+            control={control}
+            render={({ field }) => <Input {...field} />}
+          />
         </div>
         <div>
           <Label>Type de besoin</Label>
-          <Select value={f.besoin} onValueChange={(v: BesoinType) => setF({ ...f, besoin: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {BESOINS.map((b) => (
-                <SelectItem key={b} value={b}>
-                  {b}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Controller
+            name="typeBesoin"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger aria-invalid={!!errors.typeBesoin}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPE_BESOIN_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError message={errors.typeBesoin?.message} />
         </div>
         <div>
           <Label>Source</Label>
-          <Select value={f.source} onValueChange={(v: Source) => setF({ ...f, source: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(["recommandation", "site web", "appel direct", "réseaux sociaux"] as Source[]).map(
-                (s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ),
-              )}
-            </SelectContent>
-          </Select>
+          <Controller
+            name="source"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger aria-invalid={!!errors.source}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOURCE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError message={errors.source?.message} />
+        </div>
+        <div className="col-span-2">
+          <Label>Notes</Label>
+          <Controller
+            name="notes"
+            control={control}
+            render={({ field }) => (
+              <Textarea
+                {...field}
+                rows={3}
+                maxLength={2000}
+                placeholder="Informations complémentaires sur le prospect"
+                aria-invalid={!!errors.notes}
+              />
+            )}
+          />
+          <FieldError message={errors.notes?.message} />
         </div>
         <div className="col-span-2">
           <Label>Commercial assigné</Label>
-          <Select value={f.commercial} onValueChange={(v) => setF({ ...f, commercial: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {commerciaux.map((c: string) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Controller
+            name="commercialId"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value || "none"}
+                onValueChange={(value) => field.onChange(value === "none" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un commercial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Non assigné</SelectItem>
+                  {commerciaux.map((commercial) => (
+                    <SelectItem key={commercial.id} value={commercial.id}>
+                      {commercial.name ?? commercial.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={onClose}>
-          Annuler
-        </Button>
-        <Button
-          onClick={() => {
-            const nomErr = validateName(f.nom, "Nom");
-            const indErr = validateDialCode(f.indicatif);
-            const numErr = validateNationalNumber(f.numero, true);
-            const emailErr = validateEmail(f.email, false);
-            setErrors({
-              nom: nomErr || undefined,
-              indicatif: indErr || undefined,
-              numero: numErr || undefined,
-              email: emailErr || undefined,
-            });
-            if (nomErr || indErr || numErr || emailErr) return;
-            const { indicatif, numero, ...rest } = f;
-            void indicatif;
-            void numero;
-            void addProspect({
-              ...rest,
-              nom: f.nom.trim(),
-              telephone: composePhone(f.indicatif, f.numero),
-              email: f.email.trim(),
-              entreprise: f.entreprise.trim(),
-              adresse: f.adresse.trim(),
-            });
-            toast.success("Prospect créé");
-            onClose();
-          }}
-        >
-          Créer
-        </Button>
-      </DialogFooter>
+        <div className="col-span-2">
+          <FieldError message={errors.root?.server?.message} />
+        </div>
+        <DialogFooter className="col-span-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Création..." : "Créer"}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }
@@ -594,7 +719,43 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
   const navigate = useNavigate();
   const { prospects } = useProspects();
   const p = prospects.find((item) => item.id === prospect.id) || prospect;
-  const st = STATUT_STYLE[p.statut];
+  const st = getStatutStyle(p.statut);
+
+  const changeStatut = async (statut: ProspectStatut) => {
+    try {
+      await setStatut(p.id, statut);
+      toast.success(`Statut : ${statut}`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Le changement de statut a échoué."));
+    }
+  };
+
+  const convertirEnClient = async () => {
+    try {
+      const contratId = await convertir(p.id);
+      toast.success("Prospect converti en client — contrat créé en brouillon");
+      onClose();
+      navigate(`/contrats?open=${encodeURIComponent(contratId)}`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "La conversion du prospect a échoué."));
+    }
+  };
+
+  const enregistrerNote = async () => {
+    const texte = note.trim();
+    if (!texte) {
+      toast.error("La note ne peut pas être vide.");
+      return;
+    }
+
+    try {
+      await addNote(p.id, texte);
+      setNote("");
+      toast.success("Note ajoutée");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "L'ajout de la note a échoué."));
+    }
+  };
 
   return (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -622,7 +783,10 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <Select value={p.statut} onValueChange={(v: ProspectStatut) => void setStatut(p.id, v)}>
+        <Select
+          value={p.statut}
+          onValueChange={(statut: ProspectStatut) => void changeStatut(statut)}
+        >
           <SelectTrigger className="w-[180px]">
             <SelectValue />
           </SelectTrigger>
@@ -635,14 +799,7 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
           </SelectContent>
         </Select>
         {p.statut !== "Converti" && (
-          <Button
-            onClick={async () => {
-              const cid = await convertir(p.id);
-              toast.success("Prospect converti en client — contrat créé en brouillon");
-              onClose();
-              navigate(`/contrats?open=${encodeURIComponent(cid)}`);
-            }}
-          >
+          <Button onClick={() => void convertirEnClient()}>
             <ArrowRight className="h-4 w-4 mr-1.5" />
             Convertir en client
           </Button>
@@ -658,16 +815,7 @@ function ProspectDetailDialog({ prospect, onClose }: { prospect: Prospect; onClo
             rows={2}
             placeholder="Ex : rappelé le client, RDV fixé mardi 10h..."
           />
-          <Button
-            onClick={() => {
-              if (!note.trim()) return;
-              void addNote(p.id, note);
-              setNote("");
-              toast.success("Note ajoutée");
-            }}
-          >
-            Ajouter
-          </Button>
+          <Button onClick={() => void enregistrerNote()}>Ajouter</Button>
         </div>
       </div>
 

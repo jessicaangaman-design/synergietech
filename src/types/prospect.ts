@@ -18,18 +18,19 @@ export const BESOINS: BesoinType[] = [
 ];
 
 export type ProspectStatut =
-  "Nouveau" | "Contacté" | "Devis envoyé" | "Négociation" | "Converti" | "Perdu";
+  "Nouveau" | "Contacté" | "Devis envoyé" | "Négociation" | "Gagné" | "Converti" | "Perdu";
 
 export const PROSPECT_STATUTS: ProspectStatut[] = [
   "Nouveau",
   "Contacté",
   "Devis envoyé",
   "Négociation",
+  "Gagné",
   "Converti",
   "Perdu",
 ];
 
-export type Source = "recommandation" | "site web" | "appel direct" | "réseaux sociaux";
+export type Source = "recommandation" | "site web" | "appel direct" | "réseaux sociaux" | "autre";
 
 export interface Note {
   id: string;

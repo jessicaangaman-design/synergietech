@@ -39,7 +39,7 @@ const useAuth = create<AuthStore>((set) => ({
   isComptable: false,
   fetchUser: async (token) => {
     set({ loginPending: true });
-    console.log("fetch encours .......")
+    console.log("fetch encours .......");
     try {
       const response = await axios.get(`${api}user/auth`, {
         headers: {
@@ -60,7 +60,7 @@ const useAuth = create<AuthStore>((set) => ({
           loginPending: false,
           isSuperAdmin: data.role === "SUPERADMIN",
           isAdmin: data.role === "ADMIN",
-          isTechnicien: data.role === "TECHINICIEN",
+          isTechnicien: data.role === "TECHNICIEN",
           userName: data.nom,
           userId: data.id,
           isCommercial: data.role === "COMMERCIAL",

@@ -1,13 +1,19 @@
 import { useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, CalendarDays, List } from "lucide-react";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { type Intervention, type InterventionStatut, type InterventionType } from "@/types";
 import { useContrats } from "@/features/contrats/api/use-contrats";
-import { useEquipe } from "@/features/equipe/api/use-equipe";
+import { useUsers } from "@/features/equipe/api/use-equipe";
+import { RoleSTS } from "@/features/interface/enum";
 import {
   useIntervention,
   useInterventionActions,
   useInterventions,
 } from "@/features/interventions/api/use-interventions";
+import { FieldError } from "@/components/PhoneField";
+import { getApiErrorMessage } from "@/lib/api/client";
 import { formatDate, formatDateTime } from "@/lib/formatters";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -51,6 +57,23 @@ const TYPES: InterventionType[] = [
   "Contrôle périodique",
 ];
 const STATUTS: InterventionStatut[] = ["Planifiée", "En cours", "Terminée", "Annulée"];
+
+const interventionFormSchema = z.object({
+  clientNom: z.string().trim().min(1, "Le nom du client est obligatoire").max(120),
+  contratId: z.string().optional(),
+  type: z.custom<InterventionType>(
+    (value) => TYPES.includes(value as InterventionType),
+    "Type d'intervention invalide",
+  ),
+  technicien: z.string().min(1, "Veuillez sélectionner un technicien"),
+  dateHeure: z
+    .string()
+    .min(1, "La date et l'heure sont obligatoires")
+    .refine((value) => !Number.isNaN(new Date(value).getTime()), "Date invalide"),
+  description: z.string().trim().max(1000, "La description est trop longue"),
+});
+
+type InterventionFormValues = z.infer<typeof interventionFormSchema>;
 
 const STATUT_STYLE: Record<InterventionStatut, string> = {
   Planifiée: "bg-chart-1/15 text-chart-1 border-chart-1/30",
@@ -226,10 +249,14 @@ function WeekCalendar({ onOpen }: { onOpen: (id: string) => void }) {
 function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const { intervention: i } = useIntervention(id);
   const { updateIntervention: update } = useInterventionActions();
-  const { equipe } = useEquipe();
+  const { users } = useUsers();
   const techniciens = useMemo(
-    () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
-    [equipe],
+    () =>
+      users
+        .filter((user) => user.role === RoleSTS.TECHNICIEN && user.isActive)
+        .map((user) => user.name)
+        .filter((name): name is string => name !== null),
+    [users],
   );
   if (!i) return null;
 
@@ -350,121 +377,183 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
 function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   const { addIntervention: add } = useInterventionActions();
   const { contrats } = useContrats();
-  const { equipe } = useEquipe();
+  const { users } = useUsers();
   const techniciens = useMemo(
-    () => equipe.filter((m) => m.role === "technicien" && m.actif).map((m) => m.nom),
-    [equipe],
+    () =>
+      users
+        .filter((user) => user.role === RoleSTS.TECHNICIEN && user.isActive)
+        .map((user) => user.name)
+        .filter((name): name is string => name !== null),
+    [users],
   );
-  const [f, setF] = useState({
-    clientNom: "",
-    contratId: undefined as string | undefined,
-    type: "Installation" as InterventionType,
-    technicien: techniciens[0] ?? "",
-    dateHeure: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
-    description: "",
+  const {
+    clearErrors,
+    control,
+    handleSubmit,
+    setError,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<InterventionFormValues>({
+    resolver: zodResolver(interventionFormSchema),
+    defaultValues: {
+      clientNom: "",
+      contratId: undefined,
+      type: "Installation",
+      technicien: techniciens[0] ?? "",
+      dateHeure: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
+      description: "",
+    },
   });
+
+  const submit = async (values: InterventionFormValues) => {
+    clearErrors("root.server");
+
+    try {
+      await add({
+        ...values,
+        contratId: values.contratId || undefined,
+        dateHeure: new Date(values.dateHeure).toISOString(),
+        statut: "Planifiée",
+      });
+      toast.success("Intervention planifiée");
+      onClose();
+    } catch (error) {
+      const message = getApiErrorMessage(error, "La création de l'intervention a échoué.");
+      setError("root.server", { type: "server", message });
+      toast.error(message);
+    }
+  };
+
   return (
     <DialogContent>
       <DialogHeader>
         <DialogTitle>Nouvelle intervention</DialogTitle>
       </DialogHeader>
-      <div className="grid grid-cols-2 gap-3">
+      <form onSubmit={handleSubmit(submit)} className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <Label>Client / contrat existant</Label>
-          <Select
-            value={f.contratId || "none"}
-            onValueChange={(v) => {
-              if (v === "none") {
-                setF({ ...f, contratId: undefined });
-              } else {
-                const c = contrats.find((x) => x.id === v);
-                setF({ ...f, contratId: v, clientNom: c?.clientNom || "" });
-              }
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">— Client hors contrat —</SelectItem>
-              {contrats.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.clientNom} · {c.type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Controller
+            name="contratId"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value || "none"}
+                onValueChange={(value) => {
+                  if (value === "none") {
+                    field.onChange(undefined);
+                    return;
+                  }
+
+                  field.onChange(value);
+                  const contrat = contrats.find((item) => item.id === value);
+                  setValue("clientNom", contrat?.clientNom ?? "", {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Client hors contrat —</SelectItem>
+                  {contrats.map((contrat) => (
+                    <SelectItem key={contrat.id} value={contrat.id}>
+                      {contrat.clientNom} · {contrat.type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
         <div className="col-span-2">
           <Label>Nom client</Label>
-          <Input value={f.clientNom} onChange={(e) => setF({ ...f, clientNom: e.target.value })} />
+          <Controller
+            name="clientNom"
+            control={control}
+            render={({ field }) => <Input {...field} aria-invalid={!!errors.clientNom} />}
+          />
+          <FieldError message={errors.clientNom?.message} />
         </div>
         <div>
           <Label>Type</Label>
-          <Select value={f.type} onValueChange={(v: InterventionType) => setF({ ...f, type: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Controller
+            name="type"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger aria-invalid={!!errors.type}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError message={errors.type?.message} />
         </div>
         <div>
           <Label>Technicien</Label>
-          <Select value={f.technicien} onValueChange={(v) => setF({ ...f, technicien: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {techniciens.map((t: string) => (
-                <SelectItem key={t} value={t}>
-                  {t}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Controller
+            name="technicien"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner" />
+                </SelectTrigger>
+                <SelectContent>
+                  {techniciens.map((technicien) => (
+                    <SelectItem key={technicien} value={technicien}>
+                      {technicien}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError message={errors.technicien?.message} />
         </div>
         <div className="col-span-2">
           <Label>Date & heure</Label>
-          <Input
-            type="datetime-local"
-            value={f.dateHeure}
-            onChange={(e) => setF({ ...f, dateHeure: e.target.value })}
+          <Controller
+            name="dateHeure"
+            control={control}
+            render={({ field }) => (
+              <Input {...field} type="datetime-local" aria-invalid={!!errors.dateHeure} />
+            )}
           />
+          <FieldError message={errors.dateHeure?.message} />
         </div>
         <div className="col-span-2">
           <Label>Description</Label>
-          <Textarea
-            rows={2}
-            value={f.description}
-            onChange={(e) => setF({ ...f, description: e.target.value })}
+          <Controller
+            name="description"
+            control={control}
+            render={({ field }) => (
+              <Textarea {...field} rows={2} aria-invalid={!!errors.description} />
+            )}
           />
+          <FieldError message={errors.description?.message} />
         </div>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={onClose}>
-          Annuler
-        </Button>
-        <Button
-          onClick={() => {
-            if (!f.clientNom) return toast.error("Nom du client requis");
-            add({
-              ...f,
-              dateHeure: new Date(f.dateHeure).toISOString(),
-              statut: "Planifiée",
-            } as Omit<Intervention, "id">);
-            toast.success("Intervention planifiée");
-            onClose();
-          }}
-        >
-          Créer
-        </Button>
-      </DialogFooter>
+        <div className="col-span-2">
+          <FieldError message={errors.root?.server?.message} />
+        </div>
+        <DialogFooter className="col-span-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Planification..." : "Créer"}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   );
 }

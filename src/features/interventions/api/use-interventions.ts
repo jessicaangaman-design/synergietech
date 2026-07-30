@@ -2,17 +2,18 @@ import useSWR, { useSWRConfig } from "swr";
 
 import { apiRequest } from "@/lib/api/client";
 import { apiEndpoints } from "@/lib/api/endpoints";
+import { extractList, type ListResponse } from "@/lib/api/list-response";
 import type { Intervention } from "@/types";
 
 export type CreateInterventionPayload = Omit<Intervention, "id">;
 
 export function useInterventions() {
-  const { data, error, mutate, isLoading } = useSWR<Intervention[]>(
+  const { data, error, mutate, isLoading } = useSWR<ListResponse<Intervention>>(
     apiEndpoints.interventions,
     apiRequest,
   );
 
-  return { interventions: data ?? [], error, mutate, isLoading };
+  return { interventions: extractList(data), error, mutate, isLoading };
 }
 
 export function useIntervention(id?: string) {
