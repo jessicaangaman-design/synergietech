@@ -1,7 +1,7 @@
 export type InterventionType =
-  "Installation" | "Maintenance préventive" | "Dépannage" | "Contrôle périodique";
+  "INSTALLATION" | "MAINTENANCE_PREVENTIVE" | "DEPANNAGE" | "CONTROLE_PERIODIQUE";
 
-export type InterventionStatut = "Planifiée" | "En cours" | "Terminée" | "Annulée";
+export type InterventionStatut = "PLANIFIEE" | "EN_COURS" | "TERMINEE" | "ANNULEE";
 
 export interface Intervention {
   id: string;

@@ -9,6 +9,7 @@ export type CreateContratPayload = Omit<Contrat, "id" | "lignes"> & {
   lignes?: LigneContrat[];
 };
 
+
 export function useContrats() {
   const { data, error, mutate, isLoading } = useSWR<ListResponse<Contrat>>(
     apiEndpoints.contrats,

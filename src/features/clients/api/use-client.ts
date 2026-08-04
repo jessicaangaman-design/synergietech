@@ -52,12 +52,12 @@ export function useClientActions() {
   const { mutate } = useSWRConfig();
 
   const refresh = (id?: string) =>
-    Promise.all([
-      mutate(apiEndpoints.allUser),
-      id ? mutate(apiEndpoints.userId(id)) : Promise.resolve(),
-      mutate(apiEndpoints.prospects),
-      mutate(apiEndpoints.interventions),
-    ]);
+  Promise.all([
+    mutate(apiEndpoints.allUser),
+    id ? mutate(apiEndpoints.userId(id)) : Promise.resolve(),
+    mutate(apiEndpoints.prospects),
+    mutate(apiEndpoints.interventions),
+  ]);
 
   return {
     addClient: async (payload: CreateClientDto) => {
