@@ -419,6 +419,8 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
     ),
   [users]
 );
+console.log("Users :", users);
+console.log("Techniciens :", techniciens);
   const {
     clearErrors,
     control,

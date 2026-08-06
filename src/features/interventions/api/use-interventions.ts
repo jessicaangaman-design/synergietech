@@ -90,10 +90,10 @@ export function useInterventionActions() {
       await refresh();
       return toUiIntervention(extractItem(response));
     },
-    updateIntervention: async (id: string, patch: Partial<APIintervention>) => {
+    updateIntervention: async (id: string, put: Partial<APIintervention>) => {
       const response = await apiRequest<ItemResponse<APIintervention>>(
         apiEndpoints.updateIntervention(id),
-        { method: "PATCH", body: patch },
+        { method: "PUT", body: put },
       );
       await refresh(id);
       return toUiIntervention(extractItem(response));
