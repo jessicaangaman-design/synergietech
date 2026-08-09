@@ -3,11 +3,10 @@ import useSWR, { useSWRConfig } from "swr";
 import { apiRequest } from "@/lib/api/client";
 import { apiEndpoints } from "@/lib/api/endpoints";
 import { extractList, type ListResponse } from "@/lib/api/list-response";
-import type { Contrat, LigneContrat } from "@/types";
+import { Contrat, LigneContrat,CreateContratDto} from "@/features/interface/contrats.type";
 
-export type CreateContratPayload = Omit<Contrat, "id" | "lignes"> & {
-  lignes?: LigneContrat[];
-};
+
+export type CreateContratPayload = CreateContratDto;
 
 export function useContrats() {
   const { data, error, mutate, isLoading } = useSWR<ListResponse<Contrat>>(
@@ -48,23 +47,23 @@ export function useContratActions() {
     },
     updateContrat: async (id: string, patch: Partial<Contrat>) => {
       const contrat = await apiRequest<Contrat>(apiEndpoints.contrat(id), {
-        method: "PATCH",
+        method: "PUT",
         body: patch,
       });
       await refresh(id);
       return contrat;
     },
-    addLigne: async (id: string, description: string, quantite: number, prixUnitaire: number) => {
+    addLigne: async (id: string, designation: string, quantite: number, prixUnitaire: number) => {
       const ligne = await apiRequest<LigneContrat>(apiEndpoints.contratLignes(id), {
         method: "POST",
-        body: { description, quantite, prixUnitaire },
+        body: { designation, quantite, prixUnitaire },
       });
       await refresh(id);
       return ligne;
     },
     updateLigne: async (id: string, ligneId: string, patch: Partial<LigneContrat>) => {
       const ligne = await apiRequest<LigneContrat>(apiEndpoints.contratLigne(id, ligneId), {
-        method: "PATCH",
+        method: "PUT",
         body: patch,
       });
       await refresh(id);

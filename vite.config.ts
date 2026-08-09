@@ -5,7 +5,7 @@ import { defineConfig, loadEnv } from "vite";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiProxyTarget =
-    env.VITE_API_PROXY_TARGET || "https://backless-congenial-freezing.ngrok-free.dev";
+    env.VITE_API_PROXY_TARGET || "http://localhost:3001";
 
   return {
     plugins: [react(), tailwindcss()],
@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: true,
-      port: 8080,
+      port: 3334,
       proxy: {
         "/api": {
           target: apiProxyTarget,

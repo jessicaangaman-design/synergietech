@@ -48,17 +48,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { useClient, useClients } from "@/features/clients/api/use-client";
+import { StatutContrat, TypeContrat} from "@/features/interface/enum";
 
 const TYPES: ContratType[] = [
-  "Installation ponctuelle",
-  "Contrat de maintenance annuel",
-  "Abonnement télésurveillance",
+  "INSTALLATION",
+  "MAINTENANCE",
+  "ABONNEMENT",
 ];
-const STATUTS: ContratStatut[] = ["Brouillon", "Actif", "En renouvellement", "Expiré", "Résilié"];
+const STATUTS: ContratStatut[] = ["BROUILLON", "ACTIF", "RENOUVELLEMENT", "EXPIRE", "RESILIE"];
 
 const contratFormSchema = z.object({
-  clientNom: z.string().trim().min(1, "Le nom du client est obligatoire").max(120),
-  type: z.custom<ContratType>(
+  clientId: z.string().trim().min(1, "L'identifiant du client est obligatoire").max(120),
+  type: z.custom<TypeContrat>(
     (value) => TYPES.includes(value as ContratType),
     "Type de contrat invalide",
   ),
@@ -85,11 +87,11 @@ const contratFormSchema = z.object({
 type ContratFormValues = z.infer<typeof contratFormSchema>;
 
 const STATUT_STYLE: Record<ContratStatut, string> = {
-  Brouillon: "bg-muted text-muted-foreground",
-  Actif: "bg-success/15 text-success border-success/30",
-  "En renouvellement": "bg-warning/15 text-warning border-warning/30",
-  Expiré: "bg-destructive/15 text-destructive border-destructive/30",
-  Résilié: "bg-muted text-muted-foreground line-through",
+  BROUILLON: "bg-muted text-muted-foreground",
+  ACTIF: "bg-success/15 text-success border-success/30",
+  "RENOUVELLEMENT": "bg-warning/15 text-warning border-warning/30",
+  EXPIRE: "bg-destructive/15 text-destructive border-destructive/30",
+  RESILIE: "bg-muted text-muted-foreground line-through",
 };
 
 export function ContratsPage() {
@@ -103,13 +105,18 @@ export function ContratsPage() {
     if (openContratId) setDetailId(openContratId);
   }, [openContratId]);
 
-  const sorted = useMemo(
-    () => [...contrats].sort((a, b) => +new Date(b.dateSignature) - +new Date(a.dateSignature)),
-    [contrats],
-  );
+ const sorted = useMemo(
+  () =>
+    [...contrats].sort(
+      (a, b) =>
+        +(b.dateSignature ? new Date(b.dateSignature) : new Date(0)) -
+        +(a.dateSignature ? new Date(a.dateSignature) : new Date(0))
+    ),
+  [contrats]
+);
   const echeanceCount = contrats.filter((c) => {
-    const j = daysUntil(c.echeance);
-    return j >= 0 && j <= 30 && c.statut !== "Résilié" && c.statut !== "Brouillon";
+   const j = c.dateEcheance ? daysUntil(c.dateEcheance) : -1;
+    return j >= 0 && j <= 30 && c.statut !== "RESILIE" && c.statut !== "BROUILLON";
   }).length;
 
   return (
@@ -144,21 +151,21 @@ export function ContratsPage() {
           </TableHeader>
           <TableBody>
             {sorted.map((c) => {
-              const j = daysUntil(c.echeance);
+              const j =c.dateEcheance ? daysUntil(c.dateEcheance) : -1;
               const alerte =
-                j >= 0 && j <= 30 && c.statut !== "Résilié" && c.statut !== "Brouillon";
+                j >= 0 && j <= 30 && c.statut !== "RESILIE" && c.statut !== "BROUILLON";
               return (
                 <TableRow key={c.id} onClick={() => setDetailId(c.id)} className="cursor-pointer">
-                  <TableCell className="font-medium">{c.clientNom}</TableCell>
+                  <TableCell className="font-medium">{c.client?.name}</TableCell>
                   <TableCell className="text-xs">{c.type}</TableCell>
-                  <TableCell className="text-xs">{c.besoin}</TableCell>
+                  <TableCell className="text-xs">{c.type}</TableCell>
                   <TableCell className="text-right font-mono text-xs">
                     {formatFCFA(c.montant)}
                   </TableCell>
                   <TableCell className="text-xs">{formatDate(c.dateSignature)}</TableCell>
                   <TableCell className="text-xs">
                     <div className="flex items-center gap-1.5">
-                      {formatDate(c.echeance)}
+                       {c.dateSignature ? formatDate(c.dateSignature) : "-"}
                       {alerte && (
                         <Badge
                           variant="outline"
@@ -195,19 +202,19 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
   const [newLigne, setNewLigne] = useState({ description: "", quantite: 1, prixUnitaire: 0 });
 
   if (!contrat) return null;
-  const j = daysUntil(contrat.echeance);
+  const j = daysUntil(contrat.dateEcheance);
 
   return (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          {contrat.clientNom}
+          {contrat.client?.name}
           <Badge variant="outline" className={STATUT_STYLE[contrat.statut]}>
             {contrat.statut}
           </Badge>
         </DialogTitle>
         <DialogDescription>
-          {contrat.type} — {contrat.besoin}
+          {contrat.type} 
         </DialogDescription>
       </DialogHeader>
 
@@ -222,7 +229,7 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Label>Statut</Label>
           <Select
             value={contrat.statut}
-            onValueChange={(v: ContratStatut) => updateContrat(id, { statut: v })}
+            onValueChange={(v: StatutContrat) => updateContrat(id, { statut: v })}
           >
             <SelectTrigger>
               <SelectValue />
@@ -240,7 +247,7 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Label>Type</Label>
           <Select
             value={contrat.type}
-            onValueChange={(v: ContratType) => updateContrat(id, { type: v })}
+            onValueChange={(v: TypeContrat) => updateContrat(id, { type: v })}
           >
             <SelectTrigger>
               <SelectValue />
@@ -258,7 +265,7 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Label>Durée (mois)</Label>
           <Input
             type="number"
-            value={contrat.dureeMois}
+           value={contrat.dureeMois ?? ""}
             onChange={(e) => updateContrat(id, { dureeMois: Number(e.target.value) })}
           />
         </div>
@@ -266,7 +273,7 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Label>Date de signature</Label>
           <Input
             type="date"
-            value={contrat.dateSignature.slice(0, 10)}
+          value={contrat.dateSignature?.slice(0, 10) ?? ""}
             onChange={(e) =>
               updateContrat(id, { dateSignature: new Date(e.target.value).toISOString() })
             }
@@ -276,15 +283,15 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
           <Label>Échéance</Label>
           <Input
             type="date"
-            value={contrat.echeance.slice(0, 10)}
+           value={contrat.dateEcheance ? contrat.dateEcheance.slice(0, 10) : ""}
             onChange={(e) =>
-              updateContrat(id, { echeance: new Date(e.target.value).toISOString() })
+              updateContrat(id, { dateEcheance: new Date(e.target.value).toISOString() })
             }
           />
         </div>
       </div>
 
-      {j >= 0 && j <= 30 && contrat.statut !== "Résilié" && contrat.statut !== "Brouillon" && (
+      {j >= 0 && j <= 30 && contrat.statut !== "RESILIE" && contrat.statut !== "BROUILLON" && (
         <div className="flex items-center gap-2 text-sm bg-warning/10 border border-warning/30 rounded-md p-3 text-warning">
           <AlertTriangle className="h-4 w-4" />
           Ce contrat arrive à échéance dans {j} jour(s).
@@ -301,15 +308,15 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
             <div className="text-right">Total</div>
             <div />
           </div>
-          {contrat.lignes.map((l) => (
+         {(contrat.lignes ?? []).map((l) => (
             <div
               key={l.id}
               className="grid grid-cols-[1fr_80px_130px_130px_36px] gap-2 px-3 py-1.5 items-center border-t"
             >
               <Input
                 className="h-8"
-                value={l.description}
-                onChange={(e) => updateLigne(id, l.id, { description: e.target.value })}
+                value={l.designation}
+                onChange={(e) => updateLigne(id, l.id, { designation: e.target.value })}
               />
               <Input
                 type="number"
@@ -336,7 +343,7 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
               </button>
             </div>
           ))}
-          {contrat.lignes.length === 0 && (
+          {(contrat.lignes ?? []).length === 0 && (
             <div className="px-3 py-3 text-xs text-muted-foreground border-t">
               Aucune ligne. Ajoutez du matériel ou une prestation ci-dessous.
             </div>
@@ -346,7 +353,7 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
             <div />
             <div />
             <div className="text-right font-mono text-sm text-primary">
-              {formatFCFA(totalLignes(contrat.lignes))}
+              {formatFCFA(totalLignes(contrat.lignes ?? []))}
             </div>
             <div />
           </div>
@@ -405,21 +412,23 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
 function NewContratDialog({ onClose }: { onClose: () => void }) {
   const { addContrat } = useContratActions();
+  const { clients}=useClients();
   const {
     clearErrors,
     control,
     handleSubmit,
     setError,
+    setValue,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<ContratFormValues>({
     resolver: zodResolver(contratFormSchema),
     defaultValues: {
-      clientNom: "",
-      type: "Installation ponctuelle",
+     clientId : "",
+     type: TypeContrat.INSTALLATION_PONCTUELLE,
       besoin: "vidéosurveillance",
       dureeMois: 12,
-      statut: "Brouillon",
+      statut: StatutContrat.ACTIF,
       lignes: [{ description: "", quantite: 1, prixUnitaire: 0 }],
     },
   });
@@ -438,23 +447,30 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
     clearErrors("root.server");
 
     const lignesValides = values.lignes
-      .filter((ligne) => ligne.description && ligne.quantite > 0)
-      .map((ligne) => ({ ...ligne, id: crypto.randomUUID() }));
+  .filter((ligne) => ligne.description && ligne.quantite > 0)
+  .map((ligne) => ({
+    designation: ligne.description,
+    quantite: ligne.quantite,
+    prixUnitaire: ligne.prixUnitaire,
+  }));
     const now = new Date();
     const echeance = new Date(now);
     echeance.setMonth(echeance.getMonth() + values.dureeMois);
 
     try {
-      await addContrat({
-        ...values,
-        lignes: lignesValides,
-        montant: lignesValides.reduce(
-          (somme, ligne) => somme + ligne.quantite * ligne.prixUnitaire,
-          0,
-        ),
-        dateSignature: now.toISOString(),
-        echeance: echeance.toISOString(),
-      });
+     await addContrat({
+  type: values.type,
+  clientId: values.clientId,
+  statut: values.statut as StatutContrat,
+  montant: lignesValides.reduce(
+    (somme, ligne) => somme + ligne.quantite * ligne.prixUnitaire,
+    0
+  ),
+  dateSignature: now.toISOString(),
+  dateEcheance: echeance.toISOString(),
+  dureeMois: values.dureeMois,
+  lignes: lignesValides,
+});
       toast.success("Contrat créé — CA dashboard mis à jour");
       onClose();
     } catch (error) {
@@ -476,12 +492,35 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
         <div className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
             <Label>Client *</Label>
-            <Controller
-              name="clientNom"
-              control={control}
-              render={({ field }) => <Input {...field} aria-invalid={!!errors.clientNom} />}
-            />
-            <FieldError message={errors.clientNom?.message} />
+          <Controller
+  name="clientId"
+  control={control}
+  render={({ field }) => (
+    <Select
+      value={field.value || "none"}
+      onValueChange={(value) => {
+        if (value === "none") {
+          field.onChange(undefined);
+          return;
+        }
+        field.onChange(value);
+      }}
+    >
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="none">— Client hors contrat —</SelectItem>
+        {clients.map((client) => (
+          <SelectItem key={client.id} value={client.id}>
+            {client.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )}
+/>
+            <FieldError message={errors.clientId?.message} />
           </div>
           <div>
             <Label>Type</Label>

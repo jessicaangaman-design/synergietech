@@ -1,13 +1,13 @@
 import type { BesoinType } from "@/types/prospect";
 
 export type ContratType =
-  "Installation ponctuelle" | "Contrat de maintenance annuel" | "Abonnement télésurveillance";
+  "INSTALLATION" | "MAINTENANCE" | "ABONNEMENT";
 
-export type ContratStatut = "Brouillon" | "Actif" | "En renouvellement" | "Expiré" | "Résilié";
+export type ContratStatut = "BROUILLON" | "ACTIF" | "RENOUVELLEMENT" | "EXPIRE" | "RESILIE";
 
 export interface LigneContrat {
   id: string;
-  description: string;
+  designation: string;
   quantite: number;
   prixUnitaire: number;
 }
@@ -17,7 +17,7 @@ export const totalLignes = (lignes: LigneContrat[]) =>
 
 export interface Contrat {
   id: string;
-  clientNom: string;
+  
   clientId?: string;
   type: ContratType;
   besoin: BesoinType;
@@ -27,4 +27,5 @@ export interface Contrat {
   statut: ContratStatut;
   lignes: LigneContrat[];
   echeance: string;
+  
 }
