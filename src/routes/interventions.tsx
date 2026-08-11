@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, CalendarDays, List } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
@@ -54,13 +54,13 @@ const TYPES: TypeIntervention[] = [
   TypeIntervention.CONTROLE_PERIODIQUE,
   TypeIntervention.INSTALLATION,
   TypeIntervention.MAINTENANCE_PREVENTIVE,
-  TypeIntervention.DEPANNAGE  ,
+  TypeIntervention.DEPANNAGE,
 ];
 const STATUTS: StatutIntervention[] = [
   StatutIntervention.PLANIFIEE,
   StatutIntervention.EN_COURS,
   StatutIntervention.TERMINEE,
-  StatutIntervention.ANNULEE
+  StatutIntervention.ANNULEE,
 ];
 
 const interventionFormSchema = z.object({
@@ -75,9 +75,7 @@ const interventionFormSchema = z.object({
 
   description: z.string().trim().max(1000, "La description est trop longue"),
 
-  clientNom: z.string()
-    .min(1, "Le nom du client est obligatoire")
-    .max(120),
+  clientNom: z.string().min(1, "Le nom du client est obligatoire").max(120),
 
   clientId: z.string().optional(),
 
@@ -292,6 +290,17 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
   );
   if (!i) return null;
 
+  const updateStatus = async (statut: StatutIntervention) => {
+    try {
+      await update(id, { statut });
+      toast.success("Statut mis à jour");
+      return true;
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "La mise à jour du statut a échoué."));
+      return false;
+    }
+  };
+
   return (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader>
@@ -311,7 +320,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
           <Label>Statut</Label>
           <Select
             value={i.statut}
-            onValueChange={(v: StatutIntervention) => update(id, { statut: v })}
+            onValueChange={(statut: StatutIntervention) => void updateStatus(statut)}
           >
             <SelectTrigger>
               <SelectValue />
@@ -345,7 +354,9 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
           <Input
             type="datetime-local"
             value={i.dateHeure.slice(0, 16)}
-            onChange={(e) => update(id, { dateHeurePrevue: new Date(e.target.value).toISOString() })}
+            onChange={(e) =>
+              update(id, { dateHeurePrevue: new Date(e.target.value).toISOString() })
+            }
           />
         </div>
         <div className="col-span-2">
@@ -392,10 +403,10 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
         </Button>
         {i.statut !== "TERMINEE" && (
           <Button
-            onClick={() => {
-              update(id, { statut: StatutIntervention.TERMINEE });
-              toast.success("Intervention terminée");
-              onClose();
+            onClick={async () => {
+              if (await updateStatus(StatutIntervention.TERMINEE)) {
+                onClose();
+              }
             }}
           >
             Marquer terminée
@@ -411,19 +422,13 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   const { contrats } = useContrats();
   const { users } = useUsers();
   const techniciens = useMemo(
-  () =>
-    users.filter(
-      (user) =>
-        user.role === RoleSTS.TECHNICIEN &&
-        user.isActive
-    ),
-  [users]
-);
-console.log("Users :", users);
-console.log("Techniciens :", techniciens);
+    () => users.filter((user) => user.role === RoleSTS.TECHNICIEN && user.isActive),
+    [users],
+  );
   const {
     clearErrors,
     control,
+    getValues,
     handleSubmit,
     setError,
     setValue,
@@ -431,16 +436,23 @@ console.log("Techniciens :", techniciens);
   } = useForm<InterventionFormValues>({
     resolver: zodResolver(interventionFormSchema),
     defaultValues: {
-  contratId: undefined,
-  clientId: "",
-  type: TypeIntervention.INSTALLATION,
-  technicienId: techniciens[0].id ?? "",
-  dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000)
-    .toISOString()
-    .slice(0, 16),
-  description: "",
-},
+      contratId: undefined,
+      clientId: "",
+      clientNom: "",
+      type: TypeIntervention.INSTALLATION,
+      technicienId: "",
+      dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
+      description: "",
+    },
   });
+
+  useEffect(() => {
+    const firstTechnicienId = techniciens[0]?.id;
+
+    if (firstTechnicienId && !getValues("technicienId")) {
+      setValue("technicienId", firstTechnicienId, { shouldValidate: true });
+    }
+  }, [getValues, setValue, techniciens]);
 
   const submit = async (values: InterventionFormValues) => {
     console.log("submit appelé");
@@ -449,31 +461,28 @@ console.log("Techniciens :", techniciens);
     clearErrors("root.server");
     try {
       await add({
-      type: values.type,
-      dateHeurePrevue: new Date(values.dateHeurePrevue).toISOString(),
-      description: values.description,
-      clientId: values.clientId!,
-      contratId: values.contratId || undefined,
-      technicienId: values.technicienId,
-      statut: StatutIntervention.PLANIFIEE,
-  });
+        type: values.type,
+        dateHeurePrevue: new Date(values.dateHeurePrevue).toISOString(),
+        description: values.description,
+        clientId: values.clientId!,
+        contratId: values.contratId || undefined,
+        technicienId: values.technicienId,
+        statut: StatutIntervention.PLANIFIEE,
+      });
       toast.success("Intervention planifiée");
       onClose();
     } catch (error) {
-    console.error(error);
+      console.error(error);
 
-    const message = getApiErrorMessage(
-      error,
-      "La création de l'intervention a échoué."
-    );
+      const message = getApiErrorMessage(error, "La création de l'intervention a échoué.");
 
-    setError("root.server", {
-      type: "server",
-      message,
-    });
+      setError("root.server", {
+        type: "server",
+        message,
+      });
 
-    toast.error(message);
-  }
+      toast.error(message);
+    }
   };
 
   return (
@@ -482,15 +491,12 @@ console.log("Techniciens :", techniciens);
         <DialogTitle>Nouvelle intervention</DialogTitle>
       </DialogHeader>
       <form
-        onSubmit={handleSubmit(
-          submit,
-          (errors) => {
-            console.log("Erreurs RHF :", errors);
-          }
-        )}
+        onSubmit={handleSubmit(submit, (errors) => {
+          console.log("Erreurs RHF :", errors);
+        })}
         className="grid grid-cols-2 gap-3"
-      >        
-      <div className="col-span-2">
+      >
+        <div className="col-span-2">
           <Label>Client / contrat existant</Label>
           <Controller
             name="contratId"
@@ -507,14 +513,14 @@ console.log("Techniciens :", techniciens);
                   field.onChange(value);
                   const contrat = contrats.find((item) => item.id === value);
                   setValue("clientId", contrat?.clientId ?? "", {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
 
-                setValue("clientNom", contrat?.clientNom ?? "", {
-                  shouldDirty: true,
-                  shouldValidate: true,
-                });
+                  setValue("clientNom", contrat?.clientNom ?? "", {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
                 }}
               >
                 <SelectTrigger>
@@ -538,11 +544,7 @@ console.log("Techniciens :", techniciens);
             name="clientNom"
             control={control}
             render={({ field }) => (
-              <Input
-                {...field}
-                placeholder="Nom du client"
-                aria-invalid={!!errors.clientNom}
-              />
+              <Input {...field} placeholder="Nom du client" aria-invalid={!!errors.clientNom} />
             )}
           />
           <FieldError message={errors.clientId?.message} />
