@@ -3,10 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, CalendarDays, List } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { type Intervention, type InterventionStatut, type InterventionType } from "@/types";
+import { type Intervention } from "@/types";
 import { useContrats } from "@/features/contrats/api/use-contrats";
 import { useUsers } from "@/features/equipe/api/use-equipe";
-import { RoleSTS } from "@/features/interface/enum";
+import { RoleSTS, StatutIntervention, TypeIntervention } from "@/features/interface/enum";
 import {
   useIntervention,
   useInterventionActions,
@@ -50,36 +50,68 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 
-const TYPES: InterventionType[] = [
-  "Installation",
-  "Maintenance préventive",
-  "Dépannage",
-  "Contrôle périodique",
+const TYPES: TypeIntervention[] = [
+  TypeIntervention.CONTROLE_PERIODIQUE,
+  TypeIntervention.INSTALLATION,
+  TypeIntervention.MAINTENANCE_PREVENTIVE,
+  TypeIntervention.DEPANNAGE  ,
 ];
-const STATUTS: InterventionStatut[] = ["Planifiée", "En cours", "Terminée", "Annulée"];
+const STATUTS: StatutIntervention[] = [
+  StatutIntervention.PLANIFIEE,
+  StatutIntervention.EN_COURS,
+  StatutIntervention.TERMINEE,
+  StatutIntervention.ANNULEE
+];
 
 const interventionFormSchema = z.object({
-  clientNom: z.string().trim().min(1, "Le nom du client est obligatoire").max(120),
-  contratId: z.string().optional(),
-  type: z.custom<InterventionType>(
-    (value) => TYPES.includes(value as InterventionType),
+  type: z.custom<TypeIntervention>(
+    (value) => TYPES.includes(value as TypeIntervention),
     "Type d'intervention invalide",
   ),
-  technicien: z.string().min(1, "Veuillez sélectionner un technicien"),
-  dateHeure: z
+  dateHeurePrevue: z
     .string()
     .min(1, "La date et l'heure sont obligatoires")
     .refine((value) => !Number.isNaN(new Date(value).getTime()), "Date invalide"),
+
   description: z.string().trim().max(1000, "La description est trop longue"),
+
+  clientNom: z.string()
+    .min(1, "Le nom du client est obligatoire")
+    .max(120),
+
+  clientId: z.string().optional(),
+
+  contratId: z.string().optional(),
+
+  technicienId: z.string().min(1, "Veuillez sélectionner un technicien"),
+
+  // statut: z.custom<StatutIntervention>(
+  //   (value) => STATUTS.includes(value as StatutIntervention),
+  //   "Statut d'intervention invalide",
+  // ),
 });
 
+// const interventionFormSchema = z.object({
+//   clientNom: z.string().trim().min(1, "Le nom du client est obligatoire").max(120),
+//   contratId: z.string().optional(),
+//   type: z.custom<InterventionType>(
+//     (value) => TYPES.includes(value as InterventionType),
+//     "Type d'intervention invalide",
+//   ),
+//   technicien: z.string().min(1, "Veuillez sélectionner un technicien"),
+//   dateHeure: z
+//     .string()
+//     .min(1, "La date et l'heure sont obligatoires")
+//     .refine((value) => !Number.isNaN(new Date(value).getTime()), "Date invalide"),
+//   description: z.string().trim().max(1000, "La description est trop longue"),
+// });
 type InterventionFormValues = z.infer<typeof interventionFormSchema>;
 
-const STATUT_STYLE: Record<InterventionStatut, string> = {
-  Planifiée: "bg-chart-1/15 text-chart-1 border-chart-1/30",
-  "En cours": "bg-warning/15 text-warning border-warning/30",
-  Terminée: "bg-success/15 text-success border-success/30",
-  Annulée: "bg-muted text-muted-foreground",
+const STATUT_STYLE: Record<StatutIntervention, string> = {
+  PLANIFIEE: "bg-chart-1/15 text-chart-1 border-chart-1/30",
+  EN_COURS: "bg-warning/15 text-warning border-warning/30",
+  TERMINEE: "bg-success/15 text-success border-success/30",
+  ANNULEE: "bg-muted text-muted-foreground",
 };
 
 export function InterventionsPage() {
@@ -279,7 +311,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
           <Label>Statut</Label>
           <Select
             value={i.statut}
-            onValueChange={(v: InterventionStatut) => update(id, { statut: v })}
+            onValueChange={(v: StatutIntervention) => update(id, { statut: v })}
           >
             <SelectTrigger>
               <SelectValue />
@@ -295,7 +327,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
         </div>
         <div>
           <Label>Technicien</Label>
-          <Select value={i.technicien} onValueChange={(v) => update(id, { technicien: v })}>
+          <Select value={i.technicien} onValueChange={(v) => update(id, { technicienId: v })}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -313,7 +345,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
           <Input
             type="datetime-local"
             value={i.dateHeure.slice(0, 16)}
-            onChange={(e) => update(id, { dateHeure: new Date(e.target.value).toISOString() })}
+            onChange={(e) => update(id, { dateHeurePrevue: new Date(e.target.value).toISOString() })}
           />
         </div>
         <div className="col-span-2">
@@ -326,7 +358,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
         </div>
       </div>
 
-      {(i.statut === "Terminée" || i.statut === "En cours") && (
+      {(i.statut === "TERMINEE" || i.statut === "EN_COURS") && (
         <div className="mt-2 space-y-2 border-t border-border pt-3">
           <Label className="text-sm">Rapport de fin d'intervention</Label>
           <Textarea
@@ -358,10 +390,10 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
         >
           Enregistrer
         </Button>
-        {i.statut !== "Terminée" && (
+        {i.statut !== "TERMINEE" && (
           <Button
             onClick={() => {
-              update(id, { statut: "Terminée" });
+              update(id, { statut: StatutIntervention.TERMINEE });
               toast.success("Intervention terminée");
               onClose();
             }}
@@ -379,13 +411,16 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   const { contrats } = useContrats();
   const { users } = useUsers();
   const techniciens = useMemo(
-    () =>
-      users
-        .filter((user) => user.role === RoleSTS.TECHNICIEN && user.isActive)
-        .map((user) => user.name)
-        .filter((name): name is string => name !== null),
-    [users],
-  );
+  () =>
+    users.filter(
+      (user) =>
+        user.role === RoleSTS.TECHNICIEN &&
+        user.isActive
+    ),
+  [users]
+);
+console.log("Users :", users);
+console.log("Techniciens :", techniciens);
   const {
     clearErrors,
     control,
@@ -396,32 +431,49 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   } = useForm<InterventionFormValues>({
     resolver: zodResolver(interventionFormSchema),
     defaultValues: {
-      clientNom: "",
-      contratId: undefined,
-      type: "Installation",
-      technicien: techniciens[0] ?? "",
-      dateHeure: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
-      description: "",
-    },
+  contratId: undefined,
+  clientId: "",
+  type: TypeIntervention.INSTALLATION,
+  technicienId: techniciens[0].id ?? "",
+  dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 16),
+  description: "",
+},
   });
 
   const submit = async (values: InterventionFormValues) => {
-    clearErrors("root.server");
+    console.log("submit appelé");
+    console.log(values);
 
+    clearErrors("root.server");
     try {
       await add({
-        ...values,
-        contratId: values.contratId || undefined,
-        dateHeure: new Date(values.dateHeure).toISOString(),
-        statut: "Planifiée",
-      });
+      type: values.type,
+      dateHeurePrevue: new Date(values.dateHeurePrevue).toISOString(),
+      description: values.description,
+      clientId: values.clientId!,
+      contratId: values.contratId || undefined,
+      technicienId: values.technicienId,
+      statut: StatutIntervention.PLANIFIEE,
+  });
       toast.success("Intervention planifiée");
       onClose();
     } catch (error) {
-      const message = getApiErrorMessage(error, "La création de l'intervention a échoué.");
-      setError("root.server", { type: "server", message });
-      toast.error(message);
-    }
+    console.error(error);
+
+    const message = getApiErrorMessage(
+      error,
+      "La création de l'intervention a échoué."
+    );
+
+    setError("root.server", {
+      type: "server",
+      message,
+    });
+
+    toast.error(message);
+  }
   };
 
   return (
@@ -429,8 +481,16 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
       <DialogHeader>
         <DialogTitle>Nouvelle intervention</DialogTitle>
       </DialogHeader>
-      <form onSubmit={handleSubmit(submit)} className="grid grid-cols-2 gap-3">
-        <div className="col-span-2">
+      <form
+        onSubmit={handleSubmit(
+          submit,
+          (errors) => {
+            console.log("Erreurs RHF :", errors);
+          }
+        )}
+        className="grid grid-cols-2 gap-3"
+      >        
+      <div className="col-span-2">
           <Label>Client / contrat existant</Label>
           <Controller
             name="contratId"
@@ -446,10 +506,15 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
 
                   field.onChange(value);
                   const contrat = contrats.find((item) => item.id === value);
-                  setValue("clientNom", contrat?.clientNom ?? "", {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  });
+                  setValue("clientId", contrat?.clientId ?? "", {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+
+                setValue("clientNom", contrat?.clientNom ?? "", {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
                 }}
               >
                 <SelectTrigger>
@@ -472,9 +537,15 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
           <Controller
             name="clientNom"
             control={control}
-            render={({ field }) => <Input {...field} aria-invalid={!!errors.clientNom} />}
+            render={({ field }) => (
+              <Input
+                {...field}
+                placeholder="Nom du client"
+                aria-invalid={!!errors.clientNom}
+              />
+            )}
           />
-          <FieldError message={errors.clientNom?.message} />
+          <FieldError message={errors.clientId?.message} />
         </div>
         <div>
           <Label>Type</Label>
@@ -501,7 +572,7 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
         <div>
           <Label>Technicien</Label>
           <Controller
-            name="technicien"
+            name="technicienId"
             control={control}
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
@@ -510,26 +581,26 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
                 </SelectTrigger>
                 <SelectContent>
                   {techniciens.map((technicien) => (
-                    <SelectItem key={technicien} value={technicien}>
-                      {technicien}
+                    <SelectItem key={technicien.id} value={technicien.id}>
+                      {technicien.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
           />
-          <FieldError message={errors.technicien?.message} />
+          <FieldError message={errors.technicienId?.message} />
         </div>
         <div className="col-span-2">
           <Label>Date & heure</Label>
           <Controller
-            name="dateHeure"
+            name="dateHeurePrevue"
             control={control}
             render={({ field }) => (
-              <Input {...field} type="datetime-local" aria-invalid={!!errors.dateHeure} />
+              <Input {...field} type="datetime-local" aria-invalid={!!errors.dateHeurePrevue} />
             )}
           />
-          <FieldError message={errors.dateHeure?.message} />
+          <FieldError message={errors.dateHeurePrevue?.message} />
         </div>
         <div className="col-span-2">
           <Label>Description</Label>

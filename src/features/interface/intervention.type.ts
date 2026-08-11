@@ -1,6 +1,6 @@
 import { StatutIntervention, TypeIntervention } from "./enum";
 
-export interface Intervention {
+export interface APIintervention {
   id: string;
   type: TypeIntervention;
   statut: StatutIntervention;
@@ -15,6 +15,11 @@ export interface Intervention {
   updatedAt: string;
 }
 
+export interface ApiInterventionWithRelations extends APIintervention {
+  client?: { id: string; name: string } | null;
+  technicien?: { id: string; name: string } | null;
+}
+
 export interface CreateInterventionDto {
   type: TypeIntervention;
   dateHeurePrevue: string;
@@ -22,10 +27,11 @@ export interface CreateInterventionDto {
   clientId: string;
   contratId?: string;
   technicienId?: string;
+  statut?: StatutIntervention;
+
 }
 
 export type UpdateInterventionDto = Partial<CreateInterventionDto> & {
-  statut?: StatutIntervention;
   rapport?: string;
   materielRemplace?: boolean;
 };
