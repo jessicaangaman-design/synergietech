@@ -280,6 +280,9 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
   const { intervention: i } = useIntervention(id);
   const { updateIntervention: update } = useInterventionActions();
   const { users } = useUsers();
+  const [rapport, setRapport] = useState("");
+  const [materielRemplace, setMaterielRemplace] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const techniciens = useMemo(
     () =>
       users
@@ -288,16 +291,51 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
         .filter((name): name is string => name !== null),
     [users],
   );
+
+  useEffect(() => {
+    setRapport(i?.rapport ?? "");
+    setMaterielRemplace(i?.materielRemplace ?? false);
+  }, [id, i?.materielRemplace, i?.rapport]);
+
   if (!i) return null;
 
   const updateStatus = async (statut: StatutIntervention) => {
+    const normalizedReport = rapport.trim();
+
+    if (statut === StatutIntervention.TERMINEE && !normalizedReport) {
+      toast.error("Renseignez le rapport avant de clôturer l'intervention.");
+      return false;
+    }
+
+    setIsSaving(true);
     try {
-      await update(id, { statut });
+      await update(id, {
+        statut,
+        ...(statut === StatutIntervention.TERMINEE
+          ? { rapport: normalizedReport, materielRemplace }
+          : {}),
+      });
       toast.success("Statut mis à jour");
       return true;
     } catch (error) {
       toast.error(getApiErrorMessage(error, "La mise à jour du statut a échoué."));
       return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveReport = async () => {
+    setIsSaving(true);
+    try {
+      await update(id, { rapport: rapport.trim(), materielRemplace });
+      toast.success("Modifications enregistrées");
+      return true;
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "L'enregistrement du rapport a échoué."));
+      return false;
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -321,6 +359,7 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
           <Select
             value={i.statut}
             onValueChange={(statut: StatutIntervention) => void updateStatus(statut)}
+            disabled={isSaving}
           >
             <SelectTrigger>
               <SelectValue />
@@ -369,24 +408,22 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
         </div>
       </div>
 
-      {(i.statut === "TERMINEE" || i.statut === "EN_COURS") && (
-        <div className="mt-2 space-y-2 border-t border-border pt-3">
-          <Label className="text-sm">Rapport de fin d'intervention</Label>
-          <Textarea
-            rows={4}
-            placeholder="Résumé du travail effectué, tests réalisés, observations..."
-            value={i.rapport || ""}
-            onChange={(e) => update(id, { rapport: e.target.value })}
+      <div className="mt-2 space-y-2 border-t border-border pt-3">
+        <Label className="text-sm">Rapport de fin d'intervention</Label>
+        <Textarea
+          rows={4}
+          placeholder="Résumé du travail effectué, tests réalisés, observations..."
+          value={rapport}
+          onChange={(event) => setRapport(event.target.value)}
+        />
+        <label className="flex items-center gap-2 text-sm">
+          <Checkbox
+            checked={materielRemplace}
+            onCheckedChange={(value) => setMaterielRemplace(value === true)}
           />
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={i.materielRemplace || false}
-              onCheckedChange={(v) => update(id, { materielRemplace: !!v })}
-            />
-            Matériel remplacé
-          </label>
-        </div>
-      )}
+          Matériel remplacé
+        </label>
+      </div>
 
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
@@ -394,15 +431,18 @@ function InterventionDetail({ id, onClose }: { id: string; onClose: () => void }
         </Button>
         <Button
           variant="secondary"
-          onClick={() => {
-            toast.success("Modifications enregistrées");
-            onClose();
+          disabled={isSaving}
+          onClick={async () => {
+            if (await saveReport()) {
+              onClose();
+            }
           }}
         >
-          Enregistrer
+          {isSaving ? "Enregistrement..." : "Enregistrer"}
         </Button>
         {i.statut !== "TERMINEE" && (
           <Button
+            disabled={isSaving}
             onClick={async () => {
               if (await updateStatus(StatutIntervention.TERMINEE)) {
                 onClose();
@@ -436,15 +476,13 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   } = useForm<InterventionFormValues>({
     resolver: zodResolver(interventionFormSchema),
     defaultValues: {
-  contratId: undefined,
-  clientId: "",
-  type: TypeIntervention.INSTALLATION,
-  technicienId: techniciens[0]?.id ?? "",
-  dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000)
-    .toISOString()
-    .slice(0, 16),
-  description: "",
-},
+      contratId: undefined,
+      clientId: "",
+      type: TypeIntervention.INSTALLATION,
+      technicienId: techniciens[0]?.id ?? "",
+      dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
+      description: "",
+    },
   });
 
   useEffect(() => {
