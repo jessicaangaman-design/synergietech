@@ -434,7 +434,7 @@ console.log("Techniciens :", techniciens);
   contratId: undefined,
   clientId: "",
   type: TypeIntervention.INSTALLATION,
-  technicienId: techniciens[0].id ?? "",
+  technicienId: techniciens[0]?.id ?? "",
   dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000)
     .toISOString()
     .slice(0, 16),
