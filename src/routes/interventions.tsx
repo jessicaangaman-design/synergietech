@@ -436,14 +436,15 @@ function NewInterventionDialog({ onClose }: { onClose: () => void }) {
   } = useForm<InterventionFormValues>({
     resolver: zodResolver(interventionFormSchema),
     defaultValues: {
-      contratId: undefined,
-      clientId: "",
-      clientNom: "",
-      type: TypeIntervention.INSTALLATION,
-      technicienId: "",
-      dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 16),
-      description: "",
-    },
+  contratId: undefined,
+  clientId: "",
+  type: TypeIntervention.INSTALLATION,
+  technicienId: techniciens[0]?.id ?? "",
+  dateHeurePrevue: new Date(Date.now() + 24 * 3600 * 1000)
+    .toISOString()
+    .slice(0, 16),
+  description: "",
+},
   });
 
   useEffect(() => {
