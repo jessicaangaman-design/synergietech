@@ -1,5 +1,5 @@
 export const formatFCFA = (value: number) =>
-  `${new Intl.NumberFormat("fr-FR").format(Math.round(value))} FCFA`;
+  `${Math.round(value).toLocaleString("fr-FR").replace(/\u202F/g, " ")} FCFA`;
 
 export const formatDate = (iso: string | null) => {
   if (!iso) return "-";

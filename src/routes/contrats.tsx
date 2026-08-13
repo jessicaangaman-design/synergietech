@@ -9,10 +9,9 @@ import {
   type ContratStatut,
   type ContratType,
   type BesoinType,
-  type Contrat,
-  type LigneContrat,
   totalLignes,
 } from "@/types";
+import type { Contrat, LigneContrat } from "@/features/interface/contrats.type";
 import { useContrat, useContratActions, useContrats } from "@/features/contrats/api/use-contrats";
 import { FieldError } from "@/components/PhoneField";
 import { getApiErrorMessage } from "@/lib/api/client";
@@ -50,6 +49,10 @@ import {
 import { toast } from "sonner";
 import { useClient, useClients } from "@/features/clients/api/use-client";
 import { StatutContrat, TypeContrat} from "@/features/interface/enum";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import logoSts from "../assets/sts-logo.jpeg";
+
 
 const TYPES: ContratType[] = [
   "INSTALLATION",
@@ -196,14 +199,680 @@ export function ContratsPage() {
   );
 }
 
-function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
+// ============================================
+// NOMBRE EN LETTRES
+// ============================================
+
+function nombreEnLettres(nombre: number): string {
+  const unites = [
+    "",
+    "un",
+    "deux",
+    "trois",
+    "quatre",
+    "cinq",
+    "six",
+    "sept",
+    "huit",
+    "neuf",
+    "dix",
+    "onze",
+    "douze",
+    "treize",
+    "quatorze",
+    "quinze",
+    "seize",
+  ];
+
+  const dizaines = [
+    "",
+    "",
+    "vingt",
+    "trente",
+    "quarante",
+    "cinquante",
+    "soixante",
+  ];
+
+  if (nombre === 0) return "zéro";
+
+  if (nombre < 17) {
+    return unites[nombre];
+  }
+
+  if (nombre < 20) {
+    return `dix-${unites[nombre - 10]}`;
+  }
+
+  if (nombre < 70) {
+    const dizaine = Math.floor(nombre / 10);
+    const unite = nombre % 10;
+
+    if (unite === 0) {
+      return dizaines[dizaine];
+    }
+
+    if (unite === 1) {
+      return `${dizaines[dizaine]} et un`;
+    }
+
+    return `${dizaines[dizaine]}-${unites[unite]}`;
+  }
+
+  if (nombre < 80) {
+    if (nombre === 71) {
+      return "soixante et onze";
+    }
+
+    return `soixante-${nombreEnLettres(nombre - 60)}`;
+  }
+
+  if (nombre < 100) {
+    const reste = nombre - 80;
+
+    if (reste === 0) {
+      return "quatre-vingts";
+    }
+
+    return `quatre-vingt-${nombreEnLettres(reste)}`;
+  }
+
+  if (nombre < 200) {
+    const reste = nombre - 100;
+
+    if (reste === 0) {
+      return "cent";
+    }
+
+    return `cent ${nombreEnLettres(reste)}`;
+  }
+
+  if (nombre < 1000) {
+    const centaines = Math.floor(nombre / 100);
+    const reste = nombre % 100;
+
+    let texte =
+      centaines === 1
+        ? "cent"
+        : `${nombreEnLettres(centaines)} cent`;
+
+    if (reste > 0) {
+      texte += ` ${nombreEnLettres(reste)}`;
+    }
+
+    return texte;
+  }
+
+  if (nombre < 1000000) {
+    const milliers = Math.floor(nombre / 1000);
+    const reste = nombre % 1000;
+
+    let texte =
+      milliers === 1
+        ? "mille"
+        : `${nombreEnLettres(milliers)} mille`;
+
+    if (reste > 0) {
+      texte += ` ${nombreEnLettres(reste)}`;
+    }
+
+    return texte;
+  }
+
+  if (nombre < 1000000000) {
+    const millions = Math.floor(nombre / 1000000);
+    const reste = nombre % 1000000;
+
+    let texte =
+      millions === 1
+        ? "un million"
+        : `${nombreEnLettres(millions)} millions`;
+
+    if (reste > 0) {
+      texte += ` ${nombreEnLettres(reste)}`;
+    }
+
+    return texte;
+  }
+
+  return nombre.toString();
+}
+
+
+// ============================================
+// MONTANT EN TOUTES LETTRES
+// ============================================
+
+function montantEnLettresFCFA(value: number): string {
+  return `${nombreEnLettres(Math.round(value))} francs CFA`
+    .toUpperCase();
+}
+
+
+// ============================================
+// CHARGEMENT DU LOGO
+// ============================================
+
+
+async function exportContratPDF(contrat: Contrat) {
+  try {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const rouge: [number, number, number] = [
+      200,
+      16,
+      16,
+    ];
+
+    const gris: [number, number, number] = [
+      90,
+      90,
+      90,
+    ];
+
+    const largeurPage = 210;
+    const marge = 14;
+
+    // ========================================
+    // CALCUL DU TOTAL
+    // ========================================
+
+    const lignes = contrat.lignes ?? [];
+
+    const total = lignes.reduce(
+      (somme, ligne) =>
+        somme +
+        ligne.quantite * ligne.prixUnitaire,
+      0
+    );
+
+    // ========================================
+    // LOGO
+    // ========================================
+
+   
+
+    doc.addImage(
+      logoSts,
+      "JPEG",
+      14,
+      10,
+      30,
+      24
+    );
+
+    // ========================================
+    // EN-TÊTE STS
+    // ========================================
+
+    doc.setTextColor(...rouge);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+
+    doc.text(
+      "SYNERGIE TECH SOLUTIONS SARL",
+      50,
+      17
+    );
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...gris);
+
+    doc.text(
+      "Sécurité électronique, électronique et services",
+      50,
+      23
+    );
+
+    doc.text(
+      "La maison de la sécurité électronique",
+      50,
+      28
+    );
+
+    // ========================================
+    // TITRE
+    // ========================================
+
+    doc.setDrawColor(...rouge);
+    doc.setLineWidth(0.7);
+
+    doc.line(
+      marge,
+      39,
+      largeurPage - marge,
+      39
+    );
+
+    doc.setTextColor(...rouge);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(17);
+
+    doc.text(
+      "FACTURE PROFORMA",
+      largeurPage / 2,
+      49,
+      { align: "center" }
+    );
+
+    // ========================================
+    // NUMÉRO + DATE
+    // ========================================
+
+    const numeroProforma =
+      contrat.id.slice(0, 8).toUpperCase();
+
+    const dateProforma = contrat.dateSignature
+      ? formatDate(contrat.dateSignature)
+      : formatDate(new Date().toISOString());
+
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+
+    doc.text(
+      `N° PROFORMA : ${numeroProforma}`,
+      largeurPage - marge,
+      17,
+      { align: "right" }
+    );
+
+    doc.text(
+      `DATE : ${dateProforma}`,
+      largeurPage - marge,
+      23,
+      { align: "right" }
+    );
+
+    // ========================================
+    // INFORMATIONS CLIENT
+    // ========================================
+
+    doc.setFillColor(245, 245, 245);
+    doc.setDrawColor(210, 210, 210);
+
+    doc.roundedRect(
+      marge,
+      56,
+      182,
+      34,
+      2,
+      2,
+      "FD"
+    );
+
+    doc.setTextColor(...rouge);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+
+    doc.text(
+      "ADRESSE DE FACTURATION",
+      18,
+      63
+    );
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+
+    doc.text(
+      `Client : ${contrat.client?.name ?? "-"}`,
+      18,
+      70
+    );
+
+    doc.text(
+      `Référence client : ${contrat.clientId}`,
+      18,
+      76
+    );
+
+    doc.text(
+      `Type de contrat : ${contrat.type}`,
+      18,
+      82
+    );
+
+    // ========================================
+    // OBJET
+    // ========================================
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...rouge);
+    doc.setFontSize(10);
+
+    doc.text("OBJET", 14, 99);
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+
+    doc.text(
+      `DEVIS / ${contrat.type}`,
+      14,
+      106
+    );
+
+    // ========================================
+    // TABLEAU
+    // ========================================
+
+    const body = lignes.map((ligne, index) => [
+      String(index + 1),
+      ligne.designation,
+      String(ligne.quantite),
+      "U",
+      formatFCFA(ligne.prixUnitaire),
+      formatFCFA(
+        ligne.quantite * ligne.prixUnitaire
+      ),
+    ]);
+
+    autoTable(doc, {
+      startY: 112,
+
+      margin: {
+        left: marge,
+        right: marge,
+      },
+
+      head: [
+        [
+          "Réf",
+          "Désignation",
+          "Qté",
+          "U",
+          "Prix unitaire",
+          "Montant TTC",
+        ],
+      ],
+
+      body,
+
+      foot: [
+        [
+          "",
+          "",
+          "",
+          "",
+          "TOTAL TTC",
+          formatFCFA(total),
+        ],
+      ],
+
+      theme: "grid",
+
+      styles: {
+        font: "helvetica",
+        fontSize: 8.5,
+        cellPadding: 3,
+        textColor: [0, 0, 0],
+        lineColor: [190, 190, 190],
+        lineWidth: 0.2,
+        valign: "middle",
+      },
+
+      headStyles: {
+        fillColor: rouge,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        halign: "center",
+      },
+
+      footStyles: {
+        fillColor: [245, 220, 220],
+        textColor: rouge,
+        fontStyle: "bold",
+      },
+
+      columnStyles: {
+        0: {
+          cellWidth: 13,
+          halign: "center",
+        },
+
+        1: {
+          cellWidth: 75,
+        },
+
+        2: {
+          cellWidth: 17,
+          halign: "center",
+        },
+
+        3: {
+          cellWidth: 12,
+          halign: "center",
+        },
+
+        4: {
+          cellWidth: 32,
+          halign: "right",
+        },
+
+        5: {
+          cellWidth: 33,
+          halign: "right",
+        },
+      },
+    });
+
+    // ========================================
+    // POSITION APRÈS LE TABLEAU
+    // ========================================
+
+    const finalY =
+      (doc as jsPDF & {
+        lastAutoTable?: { finalY: number };
+      }).lastAutoTable?.finalY ?? 150;
+
+    let y = finalY + 10;
+
+    // ========================================
+    // MONTANT EN LETTRES
+    // ========================================
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+
+    doc.text(
+      "ARRÊTÉE LA PRÉSENTE FACTURE PROFORMA À LA SOMME DE :",
+      marge,
+      y
+    );
+
+    y += 6;
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...rouge);
+
+    const montantLettres =
+      montantEnLettresFCFA(total);
+
+    const texteMontant = doc.splitTextToSize(
+      montantLettres,
+      182
+    );
+
+    doc.text(
+      texteMontant,
+      marge,
+      y
+    );
+
+    y += texteMontant.length * 5 + 7;
+
+    // ========================================
+    // CONDITIONS DE RÈGLEMENT
+    // ========================================
+
+    doc.setFillColor(248, 248, 248);
+    doc.setDrawColor(210, 210, 210);
+
+    doc.roundedRect(
+      marge,
+      y,
+      182,
+      25,
+      2,
+      2,
+      "FD"
+    );
+
+    doc.setTextColor(...rouge);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+
+    doc.text(
+      "CONDITION DE RÈGLEMENT",
+      18,
+      y + 7
+    );
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+
+    doc.text(
+      "• 80% à la commande",
+      18,
+      y + 14
+    );
+
+    doc.text(
+      "• 20% à la fin des travaux",
+      18,
+      y + 20
+    );
+
+    y += 32;
+
+    // ========================================
+    // VALIDITÉ
+    // ========================================
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+
+    doc.text(
+      "NB : Proforma valable 01 Mois.",
+      marge,
+      y
+    );
+
+    // ========================================
+    // PIED DE PAGE
+    // ========================================
+
+    const hauteurPage =
+      doc.internal.pageSize.getHeight();
+
+    doc.setDrawColor(...rouge);
+    doc.setLineWidth(0.5);
+
+    doc.line(
+      marge,
+      hauteurPage - 27,
+      largeurPage - marge,
+      hauteurPage - 27
+    );
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...gris);
+
+    doc.text(
+      "C.C N° : 2300926 G  |  Régime d'Imposition : TEE  |  Centre d'impôt : Angré",
+      largeurPage / 2,
+      hauteurPage - 21,
+      { align: "center" }
+    );
+
+    doc.text(
+      "SYNERGIE TECH SOLUTIONS SARL",
+      largeurPage / 2,
+      hauteurPage - 16,
+      { align: "center" }
+    );
+
+    doc.text(
+      "Sécurité électronique • Vidéosurveillance • Contrôle d'accès • Alarme",
+      largeurPage / 2,
+      hauteurPage - 11,
+      { align: "center" }
+    );
+
+    // ========================================
+    // NUMÉRO DE PAGE
+    // ========================================
+
+    doc.setFontSize(7);
+
+    doc.text(
+      "Page 1 / 1",
+      largeurPage - marge,
+      hauteurPage - 5,
+      { align: "right" }
+    );
+
+    // ========================================
+    // ENREGISTREMENT
+    // ========================================
+
+    const nomClient = (
+      contrat.client?.name ?? contrat.id
+    )
+      .replace(/[\\/:*?"<>|]/g, "-")
+      .trim();
+
+    doc.save(
+      `proforma-${nomClient || contrat.id}.pdf`
+    );
+
+  } catch (error) {
+    console.error(
+      "Erreur lors de l'export PDF :",
+      error
+    );
+
+    alert(
+      `Impossible de générer le PDF : ${
+        error instanceof Error
+          ? error.message
+          : String(error)
+      }`
+    );
+  }
+}
+
+function ContratDetail({
+  id,
+  onClose,
+}: {
+  id: string;
+  onClose: () => void;
+}) {
   const { contrat } = useContrat(id);
-  const { updateContrat, addLigne, updateLigne, removeLigne } = useContratActions();
-  const [newLigne, setNewLigne] = useState({ description: "", quantite: 1, prixUnitaire: 0 });
+  const {
+    updateContrat,
+    addLigne,
+    updateLigne,
+    removeLigne,
+  } = useContratActions();
+
+  const [newLigne, setNewLigne] = useState({
+    description: "",
+    quantite: 1,
+    prixUnitaire: 0,
+  });
 
   if (!contrat) return null;
-  const j = daysUntil(contrat.dateEcheance);
 
+  const j = daysUntil(contrat.dateEcheance);
   return (
     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader>
@@ -396,6 +1065,9 @@ function ContratDetail({ id, onClose }: { id: string; onClose: () => void }) {
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
           Fermer
+          </Button>
+           <Button variant="outline" onClick={() => exportContratPDF(contrat)}>
+            Exporter en PDF
         </Button>
         <Button
           onClick={() => {
@@ -713,7 +1385,10 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
             {isSubmitting ? "Création..." : "Créer le devis"}
           </Button>
         </DialogFooter>
-      </form>
-    </DialogContent>
+
+        </form>
+        </DialogContent>
+      
+        
   );
 }
