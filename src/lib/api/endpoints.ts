@@ -25,10 +25,15 @@ export const apiEndpoints = {
   createUser: `${api}user/create`,
   updateUser: (id: string) => `${api}user/update/${id}`,
   deleteUser: (id: string) => `${api}user/delete/${id}`,
-  client :  `${api}client`,
-  createClient :  `${api}client`,
-  clientId:  (id:string)=>`${api}client/${id}`,
-  updateClient: (id:string)=>`${api}client/update/${id}`,
-  deleteClient: (id:string)=>`${api}client/delete/${id}`
-
+  applicants: `${api}applicant/`,
+  applicantId: (id: string) => `${api}applicant/get/${id}`,
+  updateApplicant: (id: string) => `${api}applicant/update/${id}`,
+  deleteApplicant: (id: string) => `${api}applicant/delete/${id}`,
+  validateApplicant: (id: string) => `${api}applicant/validate/${id}`,
+  queryApplicant: (statut: string) => `${api}/applicant-query/:${statut}`,
+  client: `${api}client`,
+  createClient: `${api}client`,
+  clientId: (id: string) => `${api}client/${id}`,
+  updateClient: (id: string) => `${api}client/update/${id}`,
+  deleteClient: (id: string) => `${api}client/delete/${id}`,
 } as const;

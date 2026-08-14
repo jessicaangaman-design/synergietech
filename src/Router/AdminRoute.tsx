@@ -5,6 +5,7 @@ import { ClientsPage } from "@/routes/clients";
 import { EquipePage } from "@/routes/equipe";
 import { InterventionsPage } from "@/routes/interventions";
 import { ProspectsPage } from "@/routes/prospects";
+import { ApplicantsPage } from "@/routes/applicants";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 const AdminRoutes = () => {
@@ -18,6 +19,7 @@ const AdminRoutes = () => {
         <Route path="equipes" element={<EquipePage />} />
         <Route path="interventions" element={<InterventionsPage />} />
         <Route path="prospects" element={<ProspectsPage />} />
+        <Route path="applicants" element={<ApplicantsPage />} />
       </Route>
     </Routes>
   );

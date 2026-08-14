@@ -35,18 +35,17 @@ export function useClients() {
 }
 
 export function useClient(id?: string) {
-  const { data, error, mutate, isLoading } = useSWR<Client | null>(
+  const { data, error, mutate, isLoading } = useSWR<Client | { data: Client } | null>(
     id ? `${api}client/${id}` : null,
     apiRequest,
   );
   return {
-    client: data ?? null,
+    client: data ? ("data" in data ? data.data : data) : null,
     error,
     mutate,
     isLoading,
   };
 }
-
 
 export function useClientActions() {
   const { mutate } = useSWRConfig();

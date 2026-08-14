@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Pencil, Trash2, UserCog, Wrench, Laptop } from "lucide-react";
+import { Filter, Mail, Pencil, Phone, Plus, Search, Trash2 } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { type EquipeRole, useEquipeActions, useUsers } from "@/features/equipe/api/use-equipe";
@@ -8,7 +8,8 @@ import { RoleSTS } from "@/features/interface/enum";
 import type { User } from "@/features/interface/user.type";
 import { useInterventions } from "@/features/interventions/api/use-interventions";
 import { useProspects } from "@/features/prospects/api/use-prospects";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, getApiErrorMessage } from "@/lib/api/client";
+import { formatDate } from "@/lib/formatters";
 import { validateName, validateEmail, stripDigits } from "@/lib/validation";
 import {
   PhoneField,
@@ -53,6 +54,40 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 type Editing = { mode: "create"; role: EquipeRole } | { mode: "edit"; membre: User } | null;
+
+const EQUIPE_ROLES: EquipeRole[] = [
+  RoleSTS.COMMERCIAL,
+  RoleSTS.TECHNICIEN,
+  RoleSTS.SECRETAIRE,
+  RoleSTS.ADMIN,
+];
+
+const ROLE_LABEL: Record<EquipeRole, string> = {
+  [RoleSTS.COMMERCIAL]: "Commercial",
+  [RoleSTS.TECHNICIEN]: "Technicien",
+  [RoleSTS.SECRETAIRE]: "Secrétaire",
+  [RoleSTS.ADMIN]: "Administrateur",
+};
+
+const ROLE_STYLE: Record<EquipeRole, string> = {
+  [RoleSTS.COMMERCIAL]: "bg-chart-1/15 text-chart-1 border-chart-1/30",
+  [RoleSTS.TECHNICIEN]: "bg-warning/15 text-warning border-warning/30",
+  [RoleSTS.SECRETAIRE]: "bg-chart-2/15 text-chart-2 border-chart-2/30",
+  [RoleSTS.ADMIN]: "bg-primary/10 text-primary border-primary/20",
+};
+
+function isEquipeRole(role: RoleSTS): role is EquipeRole {
+  return EQUIPE_ROLES.includes(role as EquipeRole);
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
 
 const createMembreFormSchema = (isEdit: boolean) =>
   z
@@ -114,169 +149,293 @@ export function EquipePage() {
 
   const [editing, setEditing] = useState<Editing>(null);
   const [toDelete, setToDelete] = useState<User | null>(null);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<EquipeRole | "ALL">("ALL");
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
 
-  const commerciaux = useMemo(
-    () => users.filter((user) => user.role === RoleSTS.COMMERCIAL),
-    [users],
-  );
+  const members = useMemo(() => users.filter((user) => isEquipeRole(user.role)), [users]);
 
-  const techniciens = useMemo(
-    () => users.filter((user) => user.role === RoleSTS.TECHNICIEN),
-    [users],
-  );
+  const counts = useMemo(() => {
+    const result: Record<string, number> = { ALL: members.length };
+    for (const role of EQUIPE_ROLES) result[role] = 0;
+    for (const member of members) result[member.role]++;
+    return result;
+  }, [members]);
 
-    const secretaire = useMemo(
-    () => users.filter((user) => user.role === RoleSTS.SECRETAIRE),
-    [users],
-  );
-  const admins = useMemo(() => users.filter((user) => user.role === RoleSTS.ADMIN), [users]);
+  const filtered = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase("fr-FR");
+
+    return members.filter(
+      (member) =>
+        (tab === "ALL" || member.role === tab) &&
+        (activeFilter === "ALL" ||
+          (activeFilter === "ACTIVE" ? member.isActive : !member.isActive)) &&
+        (query === "" ||
+          (member.name ?? "").toLocaleLowerCase("fr-FR").includes(query) ||
+          member.email.toLocaleLowerCase("fr-FR").includes(query) ||
+          (member.phone ?? "").toLocaleLowerCase("fr-FR").includes(query)),
+    );
+  }, [activeFilter, members, search, tab]);
 
   const chargeCommercial = (nom: string) =>
-    prospects.filter((p) => p.commercial === nom && p.statut !== "Perdu" && p.statut !== "Converti")
-      .length;
+    prospects.filter(
+      (prospect) =>
+        prospect.commercial === nom &&
+        prospect.statut !== "Perdu" &&
+        prospect.statut !== "Converti",
+    ).length;
+
   const chargeTech = (nom: string) =>
     interventions.filter(
-      (i) => i.technicien === nom && (i.statut === "Planifiée" || i.statut === "En cours"),
+      (intervention) =>
+        intervention.technicien === nom &&
+        (intervention.statut === "Planifiée" || intervention.statut === "En cours"),
     ).length;
+
+  const workload = (member: User) => {
+    if (member.role === RoleSTS.COMMERCIAL) {
+      return { count: chargeCommercial(member.name ?? ""), label: "prospects actifs" };
+    }
+    if (member.role === RoleSTS.TECHNICIEN) {
+      return { count: chargeTech(member.name ?? ""), label: "interventions en cours" };
+    }
+    return { count: 0, label: "tâche assignée" };
+  };
+
+  const toggleMember = async (member: User, isActive: boolean) => {
+    setPendingId(member.id);
+    try {
+      await updateMembre(member.id, { isActive });
+      toast.success(`${member.name ?? member.email} ${isActive ? "activé" : "désactivé"}`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "La mise à jour du membre a échoué."));
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+
+    setPendingId(toDelete.id);
+    try {
+      await removeMembre(toDelete.id);
+      toast.success(`${toDelete.name ?? toDelete.email} supprimé`);
+      setToDelete(null);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "La suppression du membre a échoué."));
+    } finally {
+      setPendingId(null);
+    }
+  };
+
   return (
     <div className="p-6 lg:p-8 space-y-8">
-      <PageHeader title="Équipe" subtitle="Gérez les commerciaux et techniciens de STS SARL" />
+      <PageHeader
+        title="Équipe"
+        subtitle="Gérez les membres et leurs accès à STS SARL"
+        actions={
+          <Button onClick={() => setEditing({ mode: "create", role: RoleSTS.TECHNICIEN })}>
+            <Plus className="mr-1.5 h-4 w-4" /> Nouveau membre
+          </Button>
+        }
+      />
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <UserCog className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Commerciaux ({commerciaux.length})
-            </h2>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setEditing({ mode: "create", role: RoleSTS.COMMERCIAL })}
-          >
-            <Plus className="h-4 w-4 mr-1.5" /> Nouveau commercial
-          </Button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {commerciaux.map((m) => (
-            <MembreCard
-              key={m.id}
-              m={m}
-              charge={chargeCommercial(m.name ?? "")}
-              chargeLabel="prospects actifs"
-              onEdit={() => setEditing({ mode: "edit", membre: m })}
-              onDelete={() => setToDelete(m)}
-              onToggle={(isActive) => updateMembre(m.id, { isActive })}
-            />
-          ))}
-          {commerciaux.length === 0 && (
-            <Card className="p-6 text-sm text-muted-foreground col-span-full">
-              Aucun commercial. Cliquez sur « Nouveau commercial ».
-            </Card>
-          )}
-        </div>
-      </section>
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-border pb-3">
+        {(["ALL", ...EQUIPE_ROLES] as const).map((role) => {
+          const active = tab === role;
+          const label = role === "ALL" ? "Tous" : ROLE_LABEL[role];
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Wrench className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Techniciens ({techniciens.length})
-            </h2>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setEditing({ mode: "create", role: RoleSTS.TECHNICIEN })}
-          >
-            <Plus className="h-4 w-4 mr-1.5" /> Nouveau technicien
-          </Button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {techniciens.map((m) => (
-            <MembreCard
-              key={m.id}
-              m={m}
-              charge={chargeTech(m.name ?? "")}
-              chargeLabel="interventions en cours"
-              onEdit={() => setEditing({ mode: "edit", membre: m })}
-              onDelete={() => setToDelete(m)}
-              onToggle={(isActive) => updateMembre(m.id, { isActive })}
-            />
-          ))}
-          {techniciens.length === 0 && (
-            <Card className="p-6 text-sm text-muted-foreground col-span-full">
-              Aucun technicien. Cliquez sur « Nouveau technicien ».
-            </Card>
-          )}
-        </div>
-      </section>
-       <section>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Wrench className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Secretaire ({secretaire.length})
-            </h2>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => setEditing({ mode: "create", role: RoleSTS.SECRETAIRE })}
-          >
-            <Plus className="h-4 w-4 mr-1.5" /> Nouvelle Secretaire
-          </Button>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {secretaire.map((m) => (
-            <MembreCard
-              key={m.id}
-              m={m}
-              charge={chargeTech(m.name ?? "")}
-              chargeLabel="interventions en cours"
-              onEdit={() => setEditing({ mode: "edit", membre: m })}
-              onDelete={() => setToDelete(m)}
-              onToggle={(isActive) => updateMembre(m.id, { isActive })}
-            />
-          ))}
-          {secretaire.length === 0 && (
-            <Card className="p-6 text-sm text-muted-foreground col-span-full">
-              Aucune Secretaire. Cliquez sur « Nouvelle secretaire ».
-            </Card>
-          )}
-        </div>
-      </section>
+          return (
+            <button
+              key={role}
+              type="button"
+              onClick={() => setTab(role)}
+              className={[
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-all",
+                active
+                  ? "border-foreground bg-foreground text-background shadow-sm"
+                  : "border-border bg-card text-muted-foreground hover:border-foreground/40 hover:text-foreground",
+              ].join(" ")}
+            >
+              <span>{label}</span>
+              <span
+                className={[
+                  "rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums",
+                  active ? "bg-background/20 text-background" : "bg-muted text-foreground/70",
+                ].join(" ")}
+              >
+                {counts[role] ?? 0}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Laptop className="h-4 w-4 text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              Administrateurs ({admins.length})
-            </h2>
-          </div>
-          <Button size="sm" onClick={() => setEditing({ mode: "create", role: RoleSTS.ADMIN })}>
-            <Plus className="h-4 w-4 mr-1.5" /> Nouvel administrateur
-          </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] max-w-md flex-1">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Rechercher un nom, un email ou un téléphone…"
+            className="pl-8"
+          />
         </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {admins.map((m) => (
+        <Select
+          value={activeFilter}
+          onValueChange={(value: "ALL" | "ACTIVE" | "INACTIVE") => setActiveFilter(value)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <Filter className="mr-1.5 h-3.5 w-3.5" />
+            <SelectValue placeholder="État" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Tous les états</SelectItem>
+            <SelectItem value="ACTIVE">Actifs</SelectItem>
+            <SelectItem value="INACTIVE">Inactifs</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card className="hidden overflow-hidden p-0 md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border bg-muted/50">
+              <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="py-3 pl-4 pr-2 font-semibold">Membre</th>
+                <th className="px-2 py-3 font-semibold">Contact</th>
+                <th className="px-2 py-3 font-semibold">Rôle</th>
+                <th className="px-2 py-3 font-semibold">Charge</th>
+                <th className="px-2 py-3 font-semibold">État</th>
+                <th className="px-2 py-3 font-semibold">Ajouté le</th>
+                <th className="py-3 pl-2 pr-4 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                    Aucun membre ne correspond aux filtres.
+                  </td>
+                </tr>
+              )}
+              {filtered.map((member) => {
+                const memberWorkload = workload(member);
+                const role = member.role as EquipeRole;
+
+                return (
+                  <tr
+                    key={member.id}
+                    onClick={() => setEditing({ mode: "edit", membre: member })}
+                    className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/40"
+                  >
+                    <td className="py-3 pl-4 pr-2">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                          {initials(member.name ?? member.email)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{member.name ?? member.email}</div>
+                          <div className="text-xs text-muted-foreground">{ROLE_LABEL[role]}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-2 py-3">
+                      {member.phone && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Phone className="h-3 w-3" /> {member.phone}
+                        </div>
+                      )}
+                      <div className="flex max-w-[220px] items-center gap-1 truncate text-xs text-muted-foreground">
+                        <Mail className="h-3 w-3" /> {member.email}
+                      </div>
+                    </td>
+                    <td className="px-2 py-3">
+                      <Badge variant="outline" className={ROLE_STYLE[role]}>
+                        {ROLE_LABEL[role]}
+                      </Badge>
+                    </td>
+                    <td className="px-2 py-3 text-xs text-muted-foreground">
+                      {memberWorkload.count} {memberWorkload.label}
+                    </td>
+                    <td className="px-2 py-3">
+                      <Badge
+                        variant="outline"
+                        className={
+                          member.isActive
+                            ? "border-success/30 bg-success/15 text-success"
+                            : "bg-muted text-muted-foreground"
+                        }
+                      >
+                        {member.isActive ? "Actif" : "Inactif"}
+                      </Badge>
+                    </td>
+                    <td className="px-2 py-3 text-xs text-muted-foreground">
+                      {formatDate(member.createdAt)}
+                    </td>
+                    <td
+                      className="py-3 pl-2 pr-4 text-right"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        <Switch
+                          checked={member.isActive}
+                          disabled={pendingId === member.id}
+                          onCheckedChange={(isActive) => void toggleMember(member, isActive)}
+                          aria-label={member.isActive ? "Désactiver" : "Activer"}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setEditing({ mode: "edit", membre: member })}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          <span className="sr-only">Modifier le membre</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setToDelete(member)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="sr-only">Supprimer le membre</span>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <div className="space-y-2 md:hidden">
+        {filtered.length === 0 && (
+          <Card className="p-8 text-center text-sm text-muted-foreground">
+            Aucun membre ne correspond aux filtres.
+          </Card>
+        )}
+        {filtered.map((member) => {
+          const memberWorkload = workload(member);
+          return (
             <MembreCard
-              key={m.id}
-              m={m}
-              charge={0}
-              chargeLabel="tâche assignée"
-              onEdit={() => setEditing({ mode: "edit", membre: m })}
-              onDelete={() => setToDelete(m)}
-              onToggle={(isActive) => updateMembre(m.id, { isActive })}
+              key={member.id}
+              m={member}
+              charge={memberWorkload.count}
+              chargeLabel={memberWorkload.label}
+              isPending={pendingId === member.id}
+              onEdit={() => setEditing({ mode: "edit", membre: member })}
+              onDelete={() => setToDelete(member)}
+              onToggle={(isActive) => void toggleMember(member, isActive)}
             />
-          ))}
-          {admins.length === 0 && (
-            <Card className="p-6 text-sm text-muted-foreground col-span-full">
-              Aucun administrateur. Cliquez sur « Nouvel administrateur ».
-            </Card>
-          )}
-        </div>
-      </section>
+          );
+        })}
+      </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         {editing && <MembreDialog editing={editing} onClose={() => setEditing(null)} />}
@@ -293,17 +452,15 @@ export function EquipePage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogCancel disabled={pendingId === toDelete?.id}>Annuler</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (toDelete) {
-                  removeMembre(toDelete.id);
-                  toast.success(`${toDelete.name ?? toDelete.email} supprimé`);
-                  setToDelete(null);
-                }
+              disabled={pendingId === toDelete?.id}
+              onClick={(event) => {
+                event.preventDefault();
+                void confirmDelete();
               }}
             >
-              Supprimer
+              {pendingId === toDelete?.id ? "Suppression..." : "Supprimer"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -316,6 +473,7 @@ function MembreCard({
   m,
   charge,
   chargeLabel,
+  isPending,
   onEdit,
   onDelete,
   onToggle,
@@ -323,16 +481,22 @@ function MembreCard({
   m: User;
   charge: number;
   chargeLabel: string;
+  isPending: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: (actif: boolean) => void;
 }) {
+  const role = m.role as EquipeRole;
+
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="font-semibold truncate">{m.name ?? m.email}</div>
+            <Badge variant="outline" className={ROLE_STYLE[role]}>
+              {ROLE_LABEL[role]}
+            </Badge>
             {!m.isActive && (
               <Badge variant="outline" className="bg-muted text-muted-foreground text-[10px]">
                 Inactif
@@ -350,15 +514,27 @@ function MembreCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
-          <Switch checked={m.isActive} onCheckedChange={onToggle} aria-label="Actif" />
+          <Switch
+            checked={m.isActive}
+            disabled={isPending}
+            onCheckedChange={onToggle}
+            aria-label="Actif"
+          />
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              disabled={isPending}
+              onClick={onEdit}
+            >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-destructive hover:text-destructive"
+              disabled={isPending}
               onClick={onDelete}
             >
               <Trash2 className="h-3.5 w-3.5" />

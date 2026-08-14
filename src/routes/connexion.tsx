@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import logoSts from "@/assets/logo-sts.jpg.asset.json";
+import logoSts from "@/assets/logo.png";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -126,7 +126,7 @@ return (
 
             <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg">
               <img
-                src={logoSts.url}
+                src={logoSts}
                 alt="STS SARL"
                 className="h-full w-full object-contain"
               />
@@ -200,7 +200,7 @@ return (
             <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-red-50 shadow-inner md:hidden">
 
               <img
-                src={logoSts.url}
+                src={logoSts}
                 alt="STS"
                 className="h-16 w-16 object-contain"
               />
