@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState, useEffect } from "react";
-import { Plus, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, AlertTriangle, FileSignature, Trash2 } from "lucide-react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/types";
 import type { Contrat, LigneContrat } from "@/features/interface/contrats.type";
 import { useContrat, useContratActions, useContrats } from "@/features/contrats/api/use-contrats";
+import { MaintenanceContractDialog } from "@/features/contrats/components/MaintenanceContractDialog";
 import { FieldError } from "@/components/PhoneField";
 import { getApiErrorMessage } from "@/lib/api/client";
 import { daysUntil, formatDate, formatFCFA } from "@/lib/formatters";
@@ -51,7 +52,7 @@ import { useClient, useClients } from "@/features/clients/api/use-client";
 import { StatutContrat, TypeContrat} from "@/features/interface/enum";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import logoSts from "../assets/sts-logo.jpeg";
+import logoSts from "../assets/logo.png";
 
 
 const TYPES: ContratType[] = [
@@ -869,6 +870,7 @@ function ContratDetail({
     quantite: 1,
     prixUnitaire: 0,
   });
+  const [openMaintenance, setOpenMaintenance] = useState(false);
 
   if (!contrat) return null;
 
@@ -1062,6 +1064,19 @@ function ContratDetail({
         </div>
       </div>
 
+      <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-sm font-medium">Transformer ce devis en contrat d’entretien</div>
+          <div className="text-xs text-muted-foreground">
+            Le client et les informations du devis seront repris automatiquement.
+          </div>
+        </div>
+        <Button variant="secondary" onClick={() => setOpenMaintenance(true)}>
+          <FileSignature className="h-4 w-4" />
+          Créer le contrat d’entretien
+        </Button>
+      </div>
+
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
           Fermer
@@ -1078,6 +1093,15 @@ function ContratDetail({
           Enregistrer
         </Button>
       </DialogFooter>
+
+      <Dialog open={openMaintenance} onOpenChange={setOpenMaintenance}>
+        {openMaintenance && (
+          <MaintenanceContractDialog
+            source={contrat}
+            onClose={() => setOpenMaintenance(false)}
+          />
+        )}
+      </Dialog>
     </DialogContent>
   );
 }
@@ -1100,7 +1124,7 @@ function NewContratDialog({ onClose }: { onClose: () => void }) {
      type: TypeContrat.INSTALLATION_PONCTUELLE,
       besoin: "vidéosurveillance",
       dureeMois: 12,
-      statut: StatutContrat.ACTIF,
+      statut: StatutContrat.BROUILLON,
       lignes: [{ description: "", quantite: 1, prixUnitaire: 0 }],
     },
   });

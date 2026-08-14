@@ -15,3 +15,18 @@ export interface Applicant {
   createdAt: string;
   updatedAt: string;
 }
+
+export type UpdateApplicantDto = Partial<
+  Pick<
+    Applicant,
+    | "companyName"
+    | "fullName"
+    | "email"
+    | "phone"
+    | "type"
+    | "statut"
+    | "yearsOfExist"
+    | "description"
+    | "resumeUrl"
+  >
+>;

@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import {
   Building2,
+  ClipboardList,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import { useSWRConfig } from "swr";
 
-import logoSts from "@/assets/logo-sts.jpg.asset.json";
+import logoSts from "@/assets/logo.png";
 import { Button } from "@/components/ui/button";
 import { getAppSection, NAVIGATION_BY_SECTION, type NavigationIcon } from "@/config/navigation";
 import useAuth from "@/hooks/authUser";
@@ -25,6 +26,7 @@ const NAVIGATION_ICONS: Record<NavigationIcon, typeof LayoutDashboard> = {
   clients: Building2,
   interventions: Wrench,
   team: UserCog,
+  applicants: ClipboardList,
 };
 
 export function AppLayout() {
@@ -47,7 +49,7 @@ export function AppLayout() {
       <div className="px-5 py-6 border-b border-sidebar-border flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="h-10 w-10 rounded-lg bg-white grid place-items-center overflow-hidden ring-1 ring-sidebar-border">
-            <img src={logoSts.url} alt="STS SARL" className="h-full w-full object-contain" />
+            <img src={logoSts} alt="STS SARL" className="h-full w-full object-contain" />
           </div>
           <div>
             <div className="font-semibold tracking-tight">STS SARL</div>
@@ -133,7 +135,7 @@ export function AppLayout() {
           </button>
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-md bg-white grid place-items-center overflow-hidden ring-1 ring-border">
-              <img src={logoSts.url} alt="STS" className="h-full w-full object-contain" />
+              <img src={logoSts} alt="STS" className="h-full w-full object-contain" />
             </div>
 
             <div className="font-semibold text-sm">STS SARL</div>

@@ -1,5 +1,5 @@
 export type NavigationIcon =
-  "dashboard" | "prospects" | "contracts" | "clients" | "interventions" | "team";
+  "dashboard" | "prospects" | "contracts" | "clients" | "interventions" | "team" | "applicants";
 
 export type AppSection = "admin" | "secretaire" | "commercial" | "technicien";
 
@@ -17,6 +17,7 @@ export const NAVIGATION_BY_SECTION: Record<AppSection, readonly NavigationItem[]
     { path: "clients", label: "Clients", icon: "clients" },
     { path: "interventions", label: "Interventions", icon: "interventions" },
     { path: "equipes", label: "Équipe", icon: "team" },
+    { path: "applicants", label: "Candidatures", icon: "applicants" },
   ],
   secretaire: [
     { path: "home", label: "Tableau de bord", icon: "dashboard" },
