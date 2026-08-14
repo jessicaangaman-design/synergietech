@@ -8,6 +8,7 @@ import { Contrat, LigneContrat,CreateContratDto} from "@/features/interface/cont
 
 export type CreateContratPayload = CreateContratDto;
 
+
 export function useContrats() {
   const { data, error, mutate, isLoading } = useSWR<ListResponse<Contrat>>(
     apiEndpoints.contrats,

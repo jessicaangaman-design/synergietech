@@ -1,6 +1,13 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
+import { Plus } from "lucide-react";
+import { FieldError } from "@/components/PhoneField";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import { Building2, Mail, MapPin, Phone, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
-
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +23,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useClients } from "@/features/clients/api/use-client";
+import { useClients, useClientActions } from "@/features/clients/api/use-client";
+import { DialogTrigger } from "@radix-ui/react-dialog";
+import { Dialog, DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle, } from "@/components/ui/dialog";
 
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("fr-FR", {
@@ -25,11 +37,105 @@ const formatDate = (value: string) =>
     year: "numeric",
   }).format(new Date(value));
 
+const clientFormSchema = z.object({
+  name: z.string().trim().min(1, "Le nom est obligatoire").max(120),
+  companyName: z.string().trim().max(120).optional(),
+  phone: z.string().trim().min(1, "Le téléphone est obligatoire"),
+  email: z.string().trim().email("E-mail invalide").optional().or(z.literal("")),
+  address: z.string().trim().min(1, "L'adresse est obligatoire"),
+});
+
+type ClientFormValues = z.infer<typeof clientFormSchema>;
+
+function NewClientDialog({ onClose }: { onClose: () => void }) {
+  const { addClient } = useClientActions();
+  const {
+    control,
+    clearErrors,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<ClientFormValues>({
+    resolver: zodResolver(clientFormSchema),
+    defaultValues: { name: "", companyName: "", phone: "", email: "", address: "" },
+  });
+
+  const submit = async (values: ClientFormValues) => {
+    clearErrors("root.server");
+    try {
+      await addClient({
+        name: values.name,
+        companyName: values.companyName || undefined,
+        phone: values.phone,
+        email: values.email || undefined,
+        address: values.address,
+      });
+      toast.success("Client ajouté");
+      onClose();
+    } catch (error) {
+      const message = getApiErrorMessage(error, "L'ajout du client a échoué.");
+      setError("root.server", { type: "server", message });
+      toast.error(message);
+    }
+  };
+
+  return (
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>Nouveau client</DialogTitle>
+      </DialogHeader>
+      <form onSubmit={handleSubmit(submit)} className="grid gap-3">
+        <div>
+          <Label>Nom *</Label>
+          <Controller name="name" control={control} render={({ field }) => (
+            <Input {...field} aria-invalid={!!errors.name} />
+          )} />
+          <FieldError message={errors.name?.message} />
+        </div>
+        <div>
+          <Label>Entreprise</Label>
+          <Controller name="companyName" control={control} render={({ field }) => (
+            <Input {...field} />
+          )} />
+        </div>
+        <div>
+          <Label>Téléphone *</Label>
+          <Controller name="phone" control={control} render={({ field }) => (
+            <Input {...field} aria-invalid={!!errors.phone} />
+          )} />
+          <FieldError message={errors.phone?.message} />
+        </div>
+        <div>
+          <Label>Email</Label>
+          <Controller name="email" control={control} render={({ field }) => (
+            <Input {...field} type="email" aria-invalid={!!errors.email} />
+          )} />
+          <FieldError message={errors.email?.message} />
+        </div>
+        <div>
+          <Label>Adresse *</Label>
+          <Controller name="address" control={control} render={({ field }) => (
+            <Input {...field} aria-invalid={!!errors.address} />
+          )} />
+          <FieldError message={errors.address?.message} />
+        </div>
+        <FieldError message={errors.root?.server?.message} />
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Annuler</Button>
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Ajout..." : "Ajouter"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
 export function ClientsPage() {
   const { clients, error, mutate, isLoading } = useClients();
   const [search, setSearch] = useState("");
-
-  const filteredClients = useMemo(() => {
+const [openNew, setOpenNew] = useState(false)  
+const filteredClients = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("fr");
     if (!query) return clients;
 
@@ -43,9 +149,17 @@ export function ClientsPage() {
   return (
     <div className="p-6 lg:p-8">
       <PageHeader
-        title="Clients"
-        subtitle="Consultez et recherchez les clients de Synergie Tech Solutions"
-      />
+      title="Clients"
+      subtitle="Consultez et recherchez les clients de Synergie Tech Solutions"
+      actions={
+      <Dialog open={openNew} onOpenChange={setOpenNew}>
+        <DialogTrigger asChild>
+          <Button><Plus className="h-4 w-4 mr-1.5" /> Nouveau client</Button>
+        </DialogTrigger>
+        <NewClientDialog onClose={() => setOpenNew(false)} />
+      </Dialog>
+    }
+    />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-md">
